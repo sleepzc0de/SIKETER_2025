@@ -1,0 +1,51 @@
+/* resources/css/app.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom color palette */
+@layer base {
+    :root {
+        --navy-50: #f8fafc;
+        --navy-100: #f1f5f9;
+        --navy-200: #e2e8f0;
+        --navy-300: #cbd5e1;
+        --navy-400: #94a3b8;
+        --navy-500: #64748b;
+        --navy-600: #475569;
+        --navy-700: #334155;
+        --navy-800: #1e293b;
+        --navy-900: #0f172a;
+    }
+}
+
+/* Custom components */
+@layer components {
+    .btn-primary {
+        @apply bg-gradient-to-r from-navy-600 to-navy-700 text-white px-4 py-2 rounded-md font-semibold hover:from-navy-700 hover:to-navy-800 focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 transition-all duration-200;
+    }
+
+    .btn-secondary {
+        @apply bg-white text-gray-700 px-4 py-2 rounded-md font-semibold border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 transition-all duration-200;
+    }
+
+    .input-primary {
+        @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm;
+    }
+}
+
+/* Loading animations */
+@keyframes shimmer {
+    0% {
+        background-position: -468px 0;
+    }
+    100% {
+        background-position: 468px 0;
+    }
+}
+
+.shimmer {
+    animation: shimmer 1.2s ease-in-out infinite;
+    background: linear-gradient(to right, #f6f7f8 8%, #edeef1 18%, #f6f7f8 33%);
+    background-size: 800px 104px;
+}
