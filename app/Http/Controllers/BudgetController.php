@@ -1,53 +1,71 @@
 <?php
+// app/Http/Controllers/BudgetController.php
 
 namespace App\Http\Controllers;
 
 use App\Models\BudgetCategory;
-use App\Models\BudgetRealization;
+use App\Models\Bill;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\BudgetExport;
 
 class BudgetController extends Controller
 {
     public function index(Request $request)
     {
-        $query = BudgetCategory::with('budgetRealizations');
+        $cacheKey = 'budget_index_' . md5(serialize($request->all()));
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('description', 'ILIKE', "%{$search}%")
-                  ->orWhere('kro_code', 'ILIKE', "%{$search}%")
-                  ->orWhere('account_code', 'ILIKE', "%{$search}%")
-                  ->orWhere('pic', 'ILIKE', "%{$search}%");
-            });
-        }
+        $data = Cache::remember($cacheKey, 1800, function () use ($request) {
+            $query = BudgetCategory::with(['bills' => function ($q) {
+                $q->select('budget_category_id', DB::raw('SUM(amount) as total_amount'), 'status')
+                  ->groupBy('budget_category_id', 'status');
+            }]);
 
-        if ($request->filled('pic')) {
-            $query->where('pic', $request->pic);
-        }
+            if ($request->filled('search')) {
+                $query->search($request->search);
+            }
 
-        $budgets = $query->paginate(15);
+            if ($request->filled('pic')) {
+                $query->byPIC($request->pic);
+            }
 
-        $pics = BudgetCategory::distinct()->pluck('pic');
+            if ($request->filled('kegiatan')) {
+                $query->where('kegiatan', $request->kegiatan);
+            }
 
-        return view('budget.index', compact('budgets', 'pics'));
+            $budgets = $query->paginate(20);
+            $pics = BudgetCategory::distinct()->pluck('pic');
+            $kegiatans = BudgetCategory::distinct()->pluck('kegiatan');
+
+            return compact('budgets', 'pics', 'kegiatans');
+        });
+
+        return view('budget.index', $data);
     }
 
     public function show(BudgetCategory $budget)
     {
-        $budget->load(['budgetRealizations.creator']);
+        $budget->load(['bills.creator', 'bills.approver']);
 
-        $monthlyData = $budget->budgetRealizations()
-            ->select(
-                DB::raw('EXTRACT(month FROM created_at) as month'),
-                DB::raw('SUM(amount) as total')
-            )
-            ->whereYear('created_at', date('Y'))
-            ->groupBy(DB::raw('EXTRACT(month FROM created_at)'))
-            ->orderBy('month')
-            ->get();
+        $monthlyData = Cache::remember("budget_{$budget->id}_monthly_chart", 1800, function () use ($budget) {
+            return collect([
+                ['month' => 1, 'total' => $budget->realisasi_jan],
+                ['month' => 2, 'total' => $budget->realisasi_feb],
+                ['month' => 3, 'total' => $budget->realisasi_mar],
+                ['month' => 4, 'total' => $budget->realisasi_apr],
+                ['month' => 5, 'total' => $budget->realisasi_mei],
+                ['month' => 6, 'total' => $budget->realisasi_jun],
+                ['month' => 7, 'total' => $budget->realisasi_jul],
+                ['month' => 8, 'total' => $budget->realisasi_agu],
+                ['month' => 9, 'total' => $budget->realisasi_sep],
+                ['month' => 10, 'total' => $budget->realisasi_okt],
+                ['month' => 11, 'total' => $budget->realisasi_nov],
+                ['month' => 12, 'total' => $budget->realisasi_des],
+            ]);
+        });
 
         return view('budget.show', compact('budget', 'monthlyData'));
     }
@@ -60,11 +78,12 @@ class BudgetController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'kegiatan' => 'required|string|max:255',
             'kro_code' => 'required|string|max:255',
             'ro_code' => 'required|string|max:255',
             'initial_code' => 'required|string|max:255',
             'account_code' => 'required|string|max:255',
-            'description' => 'required|string',
+            'program_kegiatan_output' => 'required|string',
             'pic' => 'required|string|max:255',
             'budget_allocation' => 'required|numeric|min:0',
             'reference' => 'required|string|max:255',
@@ -73,7 +92,13 @@ class BudgetController extends Controller
             'length' => 'required|integer|min:1',
         ]);
 
-        BudgetCategory::create($validated);
+        // Calculate sisa_anggaran initially
+        $validated['sisa_anggaran'] = $validated['budget_allocation'];
+
+        $budget = BudgetCategory::create($validated);
+
+        // Clear cache
+        Cache::tags(['budget_stats'])->flush();
 
         return redirect()->route('budget.index')->with('success', 'Data anggaran berhasil ditambahkan.');
     }
@@ -86,11 +111,12 @@ class BudgetController extends Controller
     public function update(Request $request, BudgetCategory $budget)
     {
         $validated = $request->validate([
+            'kegiatan' => 'required|string|max:255',
             'kro_code' => 'required|string|max:255',
             'ro_code' => 'required|string|max:255',
             'initial_code' => 'required|string|max:255',
             'account_code' => 'required|string|max:255',
-            'description' => 'required|string',
+            'program_kegiatan_output' => 'required|string',
             'pic' => 'required|string|max:255',
             'budget_allocation' => 'required|numeric|min:0',
             'reference' => 'required|string|max:255',
@@ -100,6 +126,13 @@ class BudgetController extends Controller
         ]);
 
         $budget->update($validated);
+        $budget->updateRealization(); // Recalculate sisa_anggaran
+
+        // Clear cache
+        Cache::tags(['budget_stats'])->flush();
+        Cache::forget("budget_{$budget->id}_total_realization");
+        Cache::forget("budget_{$budget->id}_realization_percentage");
+        Cache::forget("budget_{$budget->id}_remaining_budget");
 
         return redirect()->route('budget.show', $budget)->with('success', 'Data anggaran berhasil diperbarui.');
     }
@@ -107,10 +140,23 @@ class BudgetController extends Controller
     public function destroy(BudgetCategory $budget)
     {
         try {
-            $budget->delete();
+            DB::transaction(function () use ($budget) {
+                // Delete related bills first
+                $budget->bills()->delete();
+                $budget->delete();
+            });
+
+            // Clear cache
+            Cache::tags(['budget_stats'])->flush();
+
             return redirect()->route('budget.index')->with('success', 'Data anggaran berhasil dihapus.');
         } catch (\Exception $e) {
-            return redirect()->route('budget.index')->with('error', 'Gagal menghapus data anggaran. Data mungkin masih digunakan.');
+            return redirect()->route('budget.index')->with('error', 'Gagal menghapus data anggaran.');
         }
+    }
+
+    public function export(Request $request)
+    {
+        return Excel::download(new BudgetExport($request->all()), 'budget-data-' . date('Y-m-d') . '.xlsx');
     }
 }

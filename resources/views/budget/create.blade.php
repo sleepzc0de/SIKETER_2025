@@ -1,9 +1,8 @@
-<!-- resources/views/budget/create.blade.php -->
 @extends('layouts.app')
 
 @section('content')
 <div x-data="budgetForm()">
-    <div class="max-w-3xl mx-auto">
+    <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="mb-8">
             <nav class="flex" aria-label="Breadcrumb">
@@ -14,7 +13,6 @@
                                 <svg class="flex-shrink-0 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                                 </svg>
-                                <span class="sr-only">Home</span>
                             </a>
                         </div>
                     </li>
@@ -42,7 +40,7 @@
                     Tambah Data Anggaran
                 </h1>
                 <p class="mt-1 text-sm text-gray-500">
-                    Isi form di bawah untuk menambahkan kategori anggaran baru.
+                    Isi form di bawah untuk menambahkan kategori anggaran baru sesuai struktur Kementerian Keuangan.
                 </p>
             </div>
         </div>
@@ -56,10 +54,25 @@
                     <div class="px-6 py-5">
                         <div>
                             <h3 class="text-lg leading-6 font-medium text-gray-900">Informasi Dasar</h3>
-                            <p class="mt-1 max-w-2xl text-sm text-gray-500">Informasi dasar kategori anggaran.</p>
+                            <p class="mt-1 max-w-2xl text-sm text-gray-500">Informasi dasar kategori anggaran sesuai struktur Kementerian Keuangan.</p>
                         </div>
 
                         <div class="mt-6 sm:mt-5 space-y-6 sm:space-y-5">
+                            <!-- Kegiatan -->
+                            <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                                <label for="kegiatan" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                                    Kegiatan <span class="text-red-500">*</span>
+                                </label>
+                                <div class="mt-1 sm:mt-0 sm:col-span-2">
+                                    <input type="text" name="kegiatan" id="kegiatan" value="{{ old('kegiatan') }}" required
+                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('kegiatan') border-red-500 @enderror"
+                                           placeholder="Contoh: 4753">
+                                    @error('kegiatan')
+                                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+
                             <!-- KRO Code -->
                             <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
                                 <label for="kro_code" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
@@ -67,7 +80,8 @@
                                 </label>
                                 <div class="mt-1 sm:mt-0 sm:col-span-2">
                                     <input type="text" name="kro_code" id="kro_code" value="{{ old('kro_code') }}" required
-                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:max-w-xs sm:text-sm border-gray-300 rounded-md @error('kro_code') border-red-500 @enderror">
+                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('kro_code') border-red-500 @enderror"
+                                           placeholder="Contoh: AAH">
                                     @error('kro_code')
                                         <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -81,7 +95,8 @@
                                 </label>
                                 <div class="mt-1 sm:mt-0 sm:col-span-2">
                                     <input type="text" name="ro_code" id="ro_code" value="{{ old('ro_code') }}" required
-                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:max-w-xs sm:text-sm border-gray-300 rounded-md @error('ro_code') border-red-500 @enderror">
+                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('ro_code') border-red-500 @enderror"
+                                           placeholder="Contoh: 053">
                                     @error('ro_code')
                                         <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -91,11 +106,12 @@
                             <!-- Initial Code -->
                             <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
                                 <label for="initial_code" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
-                                    Kode Inisial <span class="text-red-500">*</span>
+                                    Inisial <span class="text-red-500">*</span>
                                 </label>
                                 <div class="mt-1 sm:mt-0 sm:col-span-2">
                                     <input type="text" name="initial_code" id="initial_code" value="{{ old('initial_code') }}" required
-                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:max-w-xs sm:text-sm border-gray-300 rounded-md @error('initial_code') border-red-500 @enderror">
+                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('initial_code') border-red-500 @enderror"
+                                           placeholder="Contoh: ROMADAN1">
                                     @error('initial_code')
                                         <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -109,22 +125,24 @@
                                 </label>
                                 <div class="mt-1 sm:mt-0 sm:col-span-2">
                                     <input type="text" name="account_code" id="account_code" value="{{ old('account_code') }}" required
-                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:max-w-xs sm:text-sm border-gray-300 rounded-md @error('account_code') border-red-500 @enderror">
+                                           class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('account_code') border-red-500 @enderror"
+                                           placeholder="Contoh: 521211">
                                     @error('account_code')
                                         <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
                                 </div>
                             </div>
 
-                            <!-- Description -->
+                            <!-- Program/Kegiatan/Output Description -->
                             <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
-                                <label for="description" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
-                                    Deskripsi <span class="text-red-500">*</span>
+                                <label for="program_kegiatan_output" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                                    Program/Kegiatan/Output/Suboutput/Komponen/Subkomp/Akun/Detil <span class="text-red-500">*</span>
                                 </label>
                                 <div class="mt-1 sm:mt-0 sm:col-span-2">
-                                    <textarea name="description" id="description" rows="4" required
-                                              class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('description') border-red-500 @enderror">{{ old('description') }}</textarea>
-                                    @error('description')
+                                    <textarea name="program_kegiatan_output" id="program_kegiatan_output" rows="4" required
+                                              class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('program_kegiatan_output') border-red-500 @enderror"
+                                              placeholder="Contoh: Peraturan/kebijakan terkait pengelolaan BMN">{{ old('program_kegiatan_output') }}</textarea>
+                                    @error('program_kegiatan_output')
                                         <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
                                 </div>
@@ -138,7 +156,7 @@
                                 <div class="mt-1 sm:mt-0 sm:col-span-2">
                                     <input type="text" name="pic" id="pic" value="{{ old('pic') }}" required
                                            class="max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('pic') border-red-500 @enderror"
-                                           placeholder="Nama PIC">
+                                           placeholder="Contoh: ROMADAN">
                                     @error('pic')
                                         <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                     @enderror
@@ -157,7 +175,7 @@
                                         </div>
                                         <input type="number" name="budget_allocation" id="budget_allocation"
                                                value="{{ old('budget_allocation') }}" required min="0" step="0.01"
-                                               class="pl-7 max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('budget_allocation') border-red-500 @enderror"
+                                               class="pl-8 max-w-lg block w-full shadow-sm focus:ring-navy-500 focus:border-navy-500 sm:text-sm border-gray-300 rounded-md @error('budget_allocation') border-red-500 @enderror"
                                                placeholder="0.00">
                                     </div>
                                     @error('budget_allocation')
