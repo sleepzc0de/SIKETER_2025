@@ -14,6 +14,7 @@
         <ul role="list" class="flex flex-1 flex-col gap-y-7">
             <li>
                 <ul role="list" class="-mx-2 space-y-1">
+                    <!-- Dashboard -->
                     <li>
                         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'bg-navy-800 text-white' : 'text-navy-200 hover:text-white hover:bg-navy-800' }} group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors duration-200">
                             <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -22,8 +23,10 @@
                             Dashboard
                         </a>
                     </li>
+
+                    <!-- Modul Keuangan -->
                     <li>
-                        <div x-data="{ open: {{ request()->routeIs('budget.*') ? 'true' : 'false' }} }">
+                        <div x-data="{ open: {{ request()->routeIs('budget.*', 'bills.*', 'reports.*') ? 'true' : 'false' }} }">
                             <button @click="open = !open" class="text-navy-200 hover:text-white hover:bg-navy-800 group flex w-full items-center gap-x-3 rounded-md p-2 text-left text-sm leading-6 font-semibold transition-colors duration-200">
                                 <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H15.75c.621 0 1.125.504 1.125 1.125v.375m-13.5 0h12m-12 0v6.75C3 14.621 3.504 15.125 4.125 15.125H8.25c.621 0 1.125-.504 1.125-1.125v-1.875m-4.5 0h3m0 0v.375c0 .621.504 1.125 1.125 1.125h2.625c.621 0 1.125-.504 1.125-1.125V12" />
@@ -39,24 +42,47 @@
                                         Data Anggaran
                                     </a>
                                 </li>
+                                @if(auth()->user()->canManageBudget())
                                 <li>
                                     <a href="{{ route('budget.create') }}" class="{{ request()->routeIs('budget.create') ? 'bg-navy-800 text-white' : 'text-navy-300 hover:text-white hover:bg-navy-800' }} block rounded-md py-2 px-3 text-sm leading-6 font-medium transition-colors duration-200">
                                         Tambah Anggaran
                                     </a>
                                 </li>
+                                @endif
                                 <li>
-                                    <a href="#" class="text-navy-300 hover:text-white hover:bg-navy-800 block rounded-md py-2 px-3 text-sm leading-6 font-medium transition-colors duration-200">
+                                    <a href="{{ route('budget.realizations') }}" class="{{ request()->routeIs('budget.realizations') ? 'bg-navy-800 text-white' : 'text-navy-300 hover:text-white hover:bg-navy-800' }} block rounded-md py-2 px-3 text-sm leading-6 font-medium transition-colors duration-200">
                                         Realisasi Anggaran
                                     </a>
                                 </li>
+                                @if(auth()->user()->canInputBills())
                                 <li>
-                                    <a href="#" class="text-navy-300 hover:text-white hover:bg-navy-800 block rounded-md py-2 px-3 text-sm leading-6 font-medium transition-colors duration-200">
+                                    <a href="{{ route('bills.index') }}" class="{{ request()->routeIs('bills.*') ? 'bg-navy-800 text-white' : 'text-navy-300 hover:text-white hover:bg-navy-800' }} block rounded-md py-2 px-3 text-sm leading-6 font-medium transition-colors duration-200">
+                                        Manajemen Tagihan
+                                    </a>
+                                </li>
+                                @endif
+                                <li>
+                                    <a href="{{ route('reports.index') }}" class="{{ request()->routeIs('reports.*') ? 'bg-navy-800 text-white' : 'text-navy-300 hover:text-white hover:bg-navy-800' }} block rounded-md py-2 px-3 text-sm leading-6 font-medium transition-colors duration-200">
                                         Laporan Keuangan
                                     </a>
                                 </li>
                             </ul>
                         </div>
                     </li>
+
+                    <!-- User Management (Admin Only) -->
+                    @if(auth()->user()->isAdmin())
+                    <li>
+                        <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'bg-navy-800 text-white' : 'text-navy-200 hover:text-white hover:bg-navy-800' }} group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors duration-200">
+                            <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                            </svg>
+                            Manajemen User
+                        </a>
+                    </li>
+                    @endif
+
+                    <!-- Modul Kepegawaian (Coming Soon) -->
                     <li>
                         <a href="#" class="text-navy-200 hover:text-white hover:bg-navy-800 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors duration-200">
                             <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -66,6 +92,8 @@
                             <span class="ml-auto inline-flex items-center rounded-full bg-yellow-500 px-2 py-0.5 text-xs font-medium text-navy-900">Soon</span>
                         </a>
                     </li>
+
+                    <!-- Modul Inventaris (Coming Soon) -->
                     <li>
                         <a href="#" class="text-navy-200 hover:text-white hover:bg-navy-800 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors duration-200">
                             <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -75,6 +103,8 @@
                             <span class="ml-auto inline-flex items-center rounded-full bg-yellow-500 px-2 py-0.5 text-xs font-medium text-navy-900">Soon</span>
                         </a>
                     </li>
+
+                    <!-- Modul Kehadiran (Coming Soon) -->
                     <li>
                         <a href="#" class="text-navy-200 hover:text-white hover:bg-navy-800 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors duration-200">
                             <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

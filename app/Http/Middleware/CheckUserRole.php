@@ -1,5 +1,4 @@
 <?php
-// app/Http/Middleware/CheckUserRole.php
 
 namespace App\Http\Middleware;
 
@@ -18,7 +17,7 @@ class CheckUserRole
         $user = auth()->user();
 
         if (!in_array($user->role, $roles)) {
-            abort(403, 'Unauthorized access.');
+            abort(403, 'Anda tidak memiliki akses untuk halaman ini.');
         }
 
         return $next($request);

@@ -1,10 +1,10 @@
 <?php
-// app/Http/Controllers/BudgetController.php
 
 namespace App\Http\Controllers;
 
 use App\Models\BudgetCategory;
 use App\Models\Bill;
+use App\Models\BudgetRealization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,56 +16,46 @@ class BudgetController extends Controller
 {
     public function index(Request $request)
     {
-        $cacheKey = 'budget_index_' . md5(serialize($request->all()));
+        $query = BudgetCategory::query();
 
-        $data = Cache::remember($cacheKey, 1800, function () use ($request) {
-            $query = BudgetCategory::with(['bills' => function ($q) {
-                $q->select('budget_category_id', DB::raw('SUM(amount) as total_amount'), 'status')
-                  ->groupBy('budget_category_id', 'status');
-            }]);
+        if ($request->filled('search')) {
+            $query->search($request->search);
+        }
 
-            if ($request->filled('search')) {
-                $query->search($request->search);
-            }
+        if ($request->filled('pic')) {
+            $query->byPIC($request->pic);
+        }
 
-            if ($request->filled('pic')) {
-                $query->byPIC($request->pic);
-            }
+        if ($request->filled('kegiatan')) {
+            $query->where('kegiatan', $request->kegiatan);
+        }
 
-            if ($request->filled('kegiatan')) {
-                $query->where('kegiatan', $request->kegiatan);
-            }
+        $budgets = $query->paginate(20);
+        $pics = BudgetCategory::distinct()->pluck('pic');
+        $kegiatans = BudgetCategory::distinct()->pluck('kegiatan');
 
-            $budgets = $query->paginate(20);
-            $pics = BudgetCategory::distinct()->pluck('pic');
-            $kegiatans = BudgetCategory::distinct()->pluck('kegiatan');
-
-            return compact('budgets', 'pics', 'kegiatans');
-        });
-
-        return view('budget.index', $data);
+        return view('budget.index', compact('budgets', 'pics', 'kegiatans'));
     }
 
-    public function show(BudgetCategory $budget)
+    public function show($id)
     {
+        $budget = BudgetCategory::findOrFail($id);
         $budget->load(['bills.creator', 'bills.approver']);
 
-        $monthlyData = Cache::remember("budget_{$budget->id}_monthly_chart", 1800, function () use ($budget) {
-            return collect([
-                ['month' => 1, 'total' => $budget->realisasi_jan],
-                ['month' => 2, 'total' => $budget->realisasi_feb],
-                ['month' => 3, 'total' => $budget->realisasi_mar],
-                ['month' => 4, 'total' => $budget->realisasi_apr],
-                ['month' => 5, 'total' => $budget->realisasi_mei],
-                ['month' => 6, 'total' => $budget->realisasi_jun],
-                ['month' => 7, 'total' => $budget->realisasi_jul],
-                ['month' => 8, 'total' => $budget->realisasi_agu],
-                ['month' => 9, 'total' => $budget->realisasi_sep],
-                ['month' => 10, 'total' => $budget->realisasi_okt],
-                ['month' => 11, 'total' => $budget->realisasi_nov],
-                ['month' => 12, 'total' => $budget->realisasi_des],
-            ]);
-        });
+        $monthlyData = collect([
+            ['month' => 1, 'total' => $budget->realisasi_jan],
+            ['month' => 2, 'total' => $budget->realisasi_feb],
+            ['month' => 3, 'total' => $budget->realisasi_mar],
+            ['month' => 4, 'total' => $budget->realisasi_apr],
+            ['month' => 5, 'total' => $budget->realisasi_mei],
+            ['month' => 6, 'total' => $budget->realisasi_jun],
+            ['month' => 7, 'total' => $budget->realisasi_jul],
+            ['month' => 8, 'total' => $budget->realisasi_agu],
+            ['month' => 9, 'total' => $budget->realisasi_sep],
+            ['month' => 10, 'total' => $budget->realisasi_okt],
+            ['month' => 11, 'total' => $budget->realisasi_nov],
+            ['month' => 12, 'total' => $budget->realisasi_des],
+        ]);
 
         return view('budget.show', compact('budget', 'monthlyData'));
     }
@@ -97,19 +87,19 @@ class BudgetController extends Controller
 
         $budget = BudgetCategory::create($validated);
 
-        // Clear cache
-        Cache::tags(['budget_stats'])->flush();
-
         return redirect()->route('budget.index')->with('success', 'Data anggaran berhasil ditambahkan.');
     }
 
-    public function edit(BudgetCategory $budget)
+    public function edit($id)
     {
+        $budget = BudgetCategory::findOrFail($id);
         return view('budget.edit', compact('budget'));
     }
 
-    public function update(Request $request, BudgetCategory $budget)
+    public function update(Request $request, $id)
     {
+        $budget = BudgetCategory::findOrFail($id);
+
         $validated = $request->validate([
             'kegiatan' => 'required|string|max:255',
             'kro_code' => 'required|string|max:255',
@@ -126,28 +116,21 @@ class BudgetController extends Controller
         ]);
 
         $budget->update($validated);
-        $budget->updateRealization(); // Recalculate sisa_anggaran
+        $budget->updateRealization();
 
-        // Clear cache
-        Cache::tags(['budget_stats'])->flush();
-        Cache::forget("budget_{$budget->id}_total_realization");
-        Cache::forget("budget_{$budget->id}_realization_percentage");
-        Cache::forget("budget_{$budget->id}_remaining_budget");
-
-        return redirect()->route('budget.show', $budget)->with('success', 'Data anggaran berhasil diperbarui.');
+        return redirect()->route('budget.show', $budget->id)->with('success', 'Data anggaran berhasil diperbarui.');
     }
 
-    public function destroy(BudgetCategory $budget)
+    public function destroy($id)
     {
         try {
+            $budget = BudgetCategory::findOrFail($id);
+
             DB::transaction(function () use ($budget) {
                 // Delete related bills first
                 $budget->bills()->delete();
                 $budget->delete();
             });
-
-            // Clear cache
-            Cache::tags(['budget_stats'])->flush();
 
             return redirect()->route('budget.index')->with('success', 'Data anggaran berhasil dihapus.');
         } catch (\Exception $e) {
@@ -158,5 +141,37 @@ class BudgetController extends Controller
     public function export(Request $request)
     {
         return Excel::download(new BudgetExport($request->all()), 'budget-data-' . date('Y-m-d') . '.xlsx');
+    }
+
+    // Budget Realizations Methods
+    public function realizations(Request $request)
+    {
+        $query = BudgetCategory::with(['bills' => function($q) {
+            $q->where('status', 'sp2d');
+        }]);
+
+        if ($request->filled('search')) {
+            $query->search($request->search);
+        }
+
+        if ($request->filled('pic')) {
+            $query->byPIC($request->pic);
+        }
+
+        $year = $request->get('year', date('Y'));
+
+        $budgets = $query->paginate(20);
+        $pics = BudgetCategory::distinct()->pluck('pic');
+
+        return view('budget.realizations', compact('budgets', 'pics', 'year'));
+    }
+
+    public function realizationDetail($id)
+    {
+        $budget = BudgetCategory::with(['bills' => function($q) {
+            $q->orderBy('created_at', 'desc');
+        }])->findOrFail($id);
+
+        return view('budget.realization-detail', compact('budget'));
     }
 }

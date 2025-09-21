@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/BillController.php
 
 namespace App\Http\Controllers;
 
@@ -80,16 +79,18 @@ class BillController extends Controller
         return redirect()->route('bills.index')->with('success', 'Tagihan berhasil ditambahkan.');
     }
 
-    public function show(Bill $bill)
+    public function show($id)
     {
-        $bill->load(['budgetCategory', 'creator', 'approver']);
+        $bill = Bill::with(['budgetCategory', 'creator', 'approver'])->findOrFail($id);
         return view('bills.show', compact('bill'));
     }
 
-    public function edit(Bill $bill)
+    public function edit($id)
     {
+        $bill = Bill::findOrFail($id);
+
         if ($bill->status === 'sp2d') {
-            return redirect()->route('bills.show', $bill)->with('error', 'Tagihan yang sudah SP2D tidak dapat diubah.');
+            return redirect()->route('bills.show', $bill->id)->with('error', 'Tagihan yang sudah SP2D tidak dapat diubah.');
         }
 
         $budgetCategories = Cache::remember('budget_categories_for_bills', 3600, function () {
@@ -99,10 +100,12 @@ class BillController extends Controller
         return view('bills.edit', compact('bill', 'budgetCategories'));
     }
 
-    public function update(Request $request, Bill $bill)
+    public function update(Request $request, $id)
     {
+        $bill = Bill::findOrFail($id);
+
         if ($bill->status === 'sp2d') {
-            return redirect()->route('bills.show', $bill)->with('error', 'Tagihan yang sudah SP2D tidak dapat diubah.');
+            return redirect()->route('bills.show', $bill->id)->with('error', 'Tagihan yang sudah SP2D tidak dapat diubah.');
         }
 
         $validated = $request->validate([
@@ -119,11 +122,13 @@ class BillController extends Controller
             $bill->update($validated);
         });
 
-        return redirect()->route('bills.show', $bill)->with('success', 'Tagihan berhasil diperbarui.');
+        return redirect()->route('bills.show', $bill->id)->with('success', 'Tagihan berhasil diperbarui.');
     }
 
-    public function updateStatus(Request $request, Bill $bill)
+    public function updateStatus(Request $request, $id)
     {
+        $bill = Bill::findOrFail($id);
+
         $validated = $request->validate([
             'status' => 'required|in:pending,sp2d,cancelled',
             'sp2d_number' => 'required_if:status,sp2d|nullable|string',
@@ -153,11 +158,13 @@ class BillController extends Controller
             'cancelled' => 'Dibatalkan'
         ];
 
-        return redirect()->route('bills.show', $bill)->with('success', "Status tagihan berhasil diubah menjadi {$statusText[$validated['status']]}.");
+        return redirect()->route('bills.show', $bill->id)->with('success', "Status tagihan berhasil diubah menjadi {$statusText[$validated['status']]}.");
     }
 
-    public function destroy(Bill $bill)
+    public function destroy($id)
     {
+        $bill = Bill::findOrFail($id);
+
         if ($bill->status === 'sp2d') {
             return redirect()->route('bills.index')->with('error', 'Tagihan yang sudah SP2D tidak dapat dihapus.');
         }

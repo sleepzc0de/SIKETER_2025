@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/UserController.php
 
 namespace App\Http\Controllers;
 
@@ -12,13 +11,13 @@ use Spatie\Permission\Models\Permission;
 
 class UserController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('permission:manage users');
-    }
-
     public function index(Request $request)
     {
+        // Check authorization in method instead of constructor
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
         $query = User::with('roles');
 
         if ($request->filled('search')) {
@@ -45,12 +44,20 @@ class UserController extends Controller
 
     public function create()
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
         $roles = Role::all();
         return view('users.create', compact('roles'));
     }
 
     public function store(Request $request)
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
@@ -68,27 +75,40 @@ class UserController extends Controller
         $this->assignRolePermissions($user, $validated['role']);
 
         // Clear user cache
-        Cache::forget("user_{$user->id}_can_approve");
-        Cache::forget("user_{$user->id}_can_manage_budget");
-        Cache::forget("user_{$user->id}_can_input_bills");
+        $this->clearUserCache($user);
 
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan.');
     }
 
-    public function show(User $user)
+    public function show($id)
     {
-        $user->load('roles', 'permissions');
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
+        $user = User::with('roles', 'permissions')->findOrFail($id);
         return view('users.show', compact('user'));
     }
 
-    public function edit(User $user)
+    public function edit($id)
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
+        $user = User::findOrFail($id);
         $roles = Role::all();
         return view('users.edit', compact('user', 'roles'));
     }
 
-    public function update(Request $request, User $user)
+    public function update(Request $request, $id)
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
+        $user = User::findOrFail($id);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $user->id,
@@ -111,11 +131,17 @@ class UserController extends Controller
         // Clear user cache
         $this->clearUserCache($user);
 
-        return redirect()->route('users.show', $user)->with('success', 'User berhasil diperbarui.');
+        return redirect()->route('users.show', $user->id)->with('success', 'User berhasil diperbarui.');
     }
 
-    public function destroy(User $user)
+    public function destroy($id)
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
+        $user = User::findOrFail($id);
+
         if ($user->id === auth()->id()) {
             return redirect()->route('users.index')->with('error', 'Anda tidak dapat menghapus akun sendiri.');
         }
@@ -126,8 +152,13 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
     }
 
-    public function toggleStatus(User $user)
+    public function toggleStatus($id)
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna.');
+        }
+
+        $user = User::findOrFail($id);
         $user->update(['is_active' => !$user->is_active]);
         $this->clearUserCache($user);
 
@@ -206,11 +237,15 @@ class UserController extends Controller
 
     private function clearUserCache(User $user)
     {
-        Cache::forget("user_{$user->id}_is_admin");
-        Cache::forget("user_{$user->id}_is_pimpinan");
-        Cache::forget("user_{$user->id}_is_ppk");
-        Cache::forget("user_{$user->id}_can_approve");
-        Cache::forget("user_{$user->id}_can_manage_budget");
-        Cache::forget("user_{$user->id}_can_input_bills");
+        try {
+            Cache::forget("user_{$user->id}_is_admin");
+            Cache::forget("user_{$user->id}_is_pimpinan");
+            Cache::forget("user_{$user->id}_is_ppk");
+            Cache::forget("user_{$user->id}_can_approve");
+            Cache::forget("user_{$user->id}_can_manage_budget");
+            Cache::forget("user_{$user->id}_can_input_bills");
+        } catch (\Exception $e) {
+            // Ignore cache errors
+        }
     }
 }
