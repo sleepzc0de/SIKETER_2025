@@ -43,6 +43,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/budget/{id}/edit', [BudgetController::class, 'edit'])->name('budget.edit')->where('id', '[0-9]+');
         Route::put('/budget/{id}', [BudgetController::class, 'update'])->name('budget.update')->where('id', '[0-9]+');
         Route::delete('/budget/{id}', [BudgetController::class, 'destroy'])->name('budget.destroy')->where('id', '[0-9]+');
+        Route::delete('/budget', [BudgetController::class, 'bulkDestroy'])->name('budget.bulk-destroy');
+        Route::get('/budget/{id}/deletion-preview', [BudgetController::class, 'deletionPreview'])->where('id', '[0-9]+');
     });
 
     // Bills Management - All authenticated users can view

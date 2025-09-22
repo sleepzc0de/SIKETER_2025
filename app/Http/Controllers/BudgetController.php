@@ -11,9 +11,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\BudgetExport;
+use App\Services\BudgetService;
 
 class BudgetController extends Controller
 {
+    protected $budgetService;
+
+    public function __construct(BudgetService $budgetService)
+    {
+        $this->budgetService = $budgetService;
+    }
+
     public function index(Request $request)
     {
         $query = BudgetCategory::query();
@@ -121,22 +129,90 @@ class BudgetController extends Controller
         return redirect()->route('budget.show', $budget->id)->with('success', 'Data anggaran berhasil diperbarui.');
     }
 
+    /**
+     * Delete budget category with comprehensive checks and cleanup
+     */
     public function destroy($id)
     {
         try {
             $budget = BudgetCategory::findOrFail($id);
 
-            DB::transaction(function () use ($budget) {
-                // Delete related bills first
-                $budget->bills()->delete();
-                $budget->delete();
-            });
+            // Authorization check
+            if (!Auth::user()->canManageBudget()) {
+                return redirect()->route('budget.index')->with('error', 'Anda tidak memiliki akses untuk menghapus data anggaran.');
+            }
 
-            return redirect()->route('budget.index')->with('success', 'Data anggaran berhasil dihapus.');
+            $result = $this->budgetService->delete($budget);
+
+            return redirect()->route('budget.index')->with('success', $result['message']);
         } catch (\Exception $e) {
-            return redirect()->route('budget.index')->with('error', 'Gagal menghapus data anggaran.');
+            \Log::error('Budget deletion failed', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'user_id' => Auth::user()->id
+            ]);
+
+            return redirect()->route('budget.index')->with('error', $e->getMessage());
         }
     }
+
+    /**
+     * Bulk delete budget categories
+     */
+    public function bulkDestroy(Request $request)
+    {
+        try {
+            // Authorization check
+            if (!Auth::user()->canManageBudget()) {
+                return redirect()->route('budget.index')->with('error', 'Anda tidak memiliki akses untuk menghapus data anggaran.');
+            }
+
+            $validated = $request->validate([
+                'budget_ids' => 'required|array|min:1',
+                'budget_ids.*' => 'exists:budget_categories,id',
+            ]);
+
+            $result = $this->budgetService->bulkDelete($validated['budget_ids']);
+
+            return redirect()->route('budget.index')->with('success', $result['message']);
+        } catch (\Exception $e) {
+            \Log::error('Bulk budget deletion failed', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::user()->id
+            ]);
+
+            return redirect()->route('budget.index')->with('error', $e->getMessage());
+        }
+    }
+
+
+    /**
+     * Get budget deletion preview
+     */
+    public function deletionPreview($id)
+    {
+        try {
+            $budget = BudgetCategory::with(['bills'])->findOrFail($id);
+            $deleteInfo = $this->budgetService->canDelete($budget);
+
+            $preview = [
+                'budget' => [
+                    'id' => $budget->id,
+                    'code' => $budget->full_code,
+                    'name' => $budget->program_kegiatan_output,
+                    'allocation' => $budget->budget_allocation,
+                ],
+                'bills' => $deleteInfo['bills_summary'],
+                'can_delete' => $deleteInfo['can_delete'],
+                'warnings' => $deleteInfo['warnings']
+            ];
+
+            return response()->json($preview);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Data tidak ditemukan'], 404);
+        }
+    }
+
 
     public function export(Request $request)
     {
@@ -146,7 +222,7 @@ class BudgetController extends Controller
     // Budget Realizations Methods
     public function realizations(Request $request)
     {
-        $query = BudgetCategory::with(['bills' => function($q) {
+        $query = BudgetCategory::with(['bills' => function ($q) {
             $q->where('status', 'sp2d');
         }]);
 
@@ -168,10 +244,34 @@ class BudgetController extends Controller
 
     public function realizationDetail($id)
     {
-        $budget = BudgetCategory::with(['bills' => function($q) {
+        $budget = BudgetCategory::with(['bills' => function ($q) {
             $q->orderBy('created_at', 'desc');
         }])->findOrFail($id);
 
         return view('budget.realization-detail', compact('budget'));
+    }
+
+    /**
+     * Clear budget-related cache
+     */
+    private function clearBudgetCache($budget)
+    {
+        try {
+            $cacheKeys = [
+                "budget_{$budget->id}_total_realization",
+                "budget_{$budget->id}_realization_percentage",
+                "budget_{$budget->id}_remaining_budget",
+                'budget_categories_for_bills',
+            ];
+
+            foreach ($cacheKeys as $key) {
+                Cache::forget($key);
+            }
+
+            // Clear tag-based cache
+            Cache::tags(['budget_stats'])->flush();
+        } catch (\Exception $e) {
+            // Ignore cache errors
+        }
     }
 }

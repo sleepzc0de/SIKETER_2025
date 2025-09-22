@@ -126,5 +126,7 @@
             </main>
         </div>
     </div>
+     <!-- Notifications -->
+    <x-notification />
 </body>
 </html>
