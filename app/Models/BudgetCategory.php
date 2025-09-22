@@ -28,14 +28,14 @@ class BudgetCategory extends Model
         'realisasi_feb',
         'realisasi_mar',
         'realisasi_apr',
-        'realisasi_mei',
+        'realisasi_mei',  // Fixed: mei not may
         'realisasi_jun',
         'realisasi_jul',
-        'realisasi_agu',
+        'realisasi_agu',  // Fixed: agu not aug
         'realisasi_sep',
-        'realisasi_okt',
+        'realisasi_okt',  // Fixed: okt not oct
         'realisasi_nov',
-        'realisasi_des',
+        'realisasi_des',  // Fixed: des not dec
         'tagihan_outstanding',
         'total_penyerapan',
         'sisa_anggaran',
@@ -48,14 +48,14 @@ class BudgetCategory extends Model
         'realisasi_feb' => 'decimal:2',
         'realisasi_mar' => 'decimal:2',
         'realisasi_apr' => 'decimal:2',
-        'realisasi_mei' => 'decimal:2',
+        'realisasi_mei' => 'decimal:2',  // Fixed
         'realisasi_jun' => 'decimal:2',
         'realisasi_jul' => 'decimal:2',
-        'realisasi_agu' => 'decimal:2',
+        'realisasi_agu' => 'decimal:2',  // Fixed
         'realisasi_sep' => 'decimal:2',
-        'realisasi_okt' => 'decimal:2',
+        'realisasi_okt' => 'decimal:2',  // Fixed
         'realisasi_nov' => 'decimal:2',
-        'realisasi_des' => 'decimal:2',
+        'realisasi_des' => 'decimal:2',  // Fixed
         'tagihan_outstanding' => 'decimal:2',
         'total_penyerapan' => 'decimal:2',
         'sisa_anggaran' => 'decimal:2',
@@ -73,7 +73,7 @@ class BudgetCategory extends Model
         }
     }
 
-    // Cached attributes with fallback
+    // Cached attributes with fallback and correct field names
     public function getTotalRealizationAttribute()
     {
         return $this->safeCache("budget_{$this->id}_total_realization", 1800, function () {
@@ -105,7 +105,7 @@ class BudgetCategory extends Model
         return "{$this->kro_code}-{$this->ro_code}-{$this->initial_code}-{$this->account_code}";
     }
 
-    // Update realization when bills change status
+    // Update realization when bills change status - Fixed field mapping
     public function updateRealization()
     {
         $monthlyRealization = $this->bills()
@@ -122,7 +122,7 @@ class BudgetCategory extends Model
             ->where('status', 'pending')
             ->sum('amount');
 
-        // Reset monthly realizations
+        // Fixed monthly field mapping
         $monthFields = [
             1 => 'realisasi_jan', 2 => 'realisasi_feb', 3 => 'realisasi_mar',
             4 => 'realisasi_apr', 5 => 'realisasi_mei', 6 => 'realisasi_jun',
@@ -132,7 +132,8 @@ class BudgetCategory extends Model
 
         $updateData = [];
         foreach ($monthFields as $month => $field) {
-            $updateData[$field] = $monthlyRealization->get($month)->total_amount ?? 0;
+            $monthRealization = $monthlyRealization->get($month);
+            $updateData[$field] = $monthRealization ? $monthRealization->total_amount : 0;
         }
 
         $totalRealization = array_sum($updateData);
@@ -150,6 +151,19 @@ class BudgetCategory extends Model
         } catch (\Exception $e) {
             // Ignore cache errors
         }
+    }
+
+    // Helper method to get monthly field name
+    public static function getMonthlyFieldName($month)
+    {
+        $monthFields = [
+            1 => 'realisasi_jan', 2 => 'realisasi_feb', 3 => 'realisasi_mar',
+            4 => 'realisasi_apr', 5 => 'realisasi_mei', 6 => 'realisasi_jun',
+            7 => 'realisasi_jul', 8 => 'realisasi_agu', 9 => 'realisasi_sep',
+            10 => 'realisasi_okt', 11 => 'realisasi_nov', 12 => 'realisasi_des'
+        ];
+
+        return $monthFields[$month] ?? null;
     }
 
     // Relationships

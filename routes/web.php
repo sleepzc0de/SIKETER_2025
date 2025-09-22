@@ -81,6 +81,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/reports/budget-realization', [ReportController::class, 'budgetRealization'])->name('reports.budget-realization');
     Route::get('/reports/bills', [ReportController::class, 'billsReport'])->name('reports.bills');
     Route::get('/reports/monthly-comparison', [ReportController::class, 'monthlyComparison'])->name('reports.monthly-comparison');
+    Route::get('/reports/trend-analysis', [ReportController::class, 'trendAnalysis'])->name('reports.trend-analysis');
+
 
     // Budget Realizations
     Route::get('/budget-realizations', [BudgetController::class, 'realizations'])->name('budget.realizations');

@@ -6,6 +6,7 @@ use App\Models\BudgetCategory;
 use App\Models\Bill;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -89,13 +90,33 @@ class ReportController extends Controller
     {
         $year = $request->get('year', date('Y'));
 
-        $monthlyData = collect(range(1, 12))->map(function ($month) use ($year) {
+        // Fix: Use correct column names from database
+        $monthFieldMapping = [
+            1 => 'realisasi_jan',
+            2 => 'realisasi_feb',
+            3 => 'realisasi_mar',
+            4 => 'realisasi_apr',
+            5 => 'realisasi_mei',  // Fixed: mei not may
+            6 => 'realisasi_jun',
+            7 => 'realisasi_jul',
+            8 => 'realisasi_agu',  // Fixed: agu not aug
+            9 => 'realisasi_sep',
+            10 => 'realisasi_okt', // Fixed: okt not oct
+            11 => 'realisasi_nov',
+            12 => 'realisasi_des', // Fixed: des not dec
+        ];
+
+        $monthlyData = collect(range(1, 12))->map(function ($month) use ($year, $monthFieldMapping) {
             $billsInMonth = Bill::where('month', $month)->where('year', $year);
+
+            // Get realization using correct column name
+            $realizationField = $monthFieldMapping[$month];
+            $realization = BudgetCategory::sum($realizationField);
 
             return [
                 'month' => $month,
-                'month_name' => date('F', mktime(0, 0, 0, $month, 1)),
-                'realization' => BudgetCategory::sum("realisasi_" . strtolower(date('M', mktime(0, 0, 0, $month, 1)))),
+                'month_name' => $this->getIndonesianMonthName($month),
+                'realization' => $realization,
                 'bills_count' => $billsInMonth->count(),
                 'sp2d_count' => $billsInMonth->where('status', 'sp2d')->count(),
                 'pending_count' => $billsInMonth->where('status', 'pending')->count(),
@@ -107,5 +128,91 @@ class ReportController extends Controller
         }
 
         return view('reports.monthly-comparison', compact('monthlyData', 'year'));
+    }
+
+    /**
+     * Get Indonesian month name
+     */
+    private function getIndonesianMonthName($month)
+    {
+        $months = [
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember',
+        ];
+
+        return $months[$month] ?? 'Unknown';
+    }
+
+    /**
+     * Trend Analysis Report
+     */
+    public function trendAnalysis(Request $request)
+    {
+        $year = $request->get('year', date('Y'));
+        $compareYear = $request->get('compare_year', $year - 1);
+
+        // Fixed: Use correct column names
+        $monthFieldMapping = [
+            1 => 'realisasi_jan',
+            2 => 'realisasi_feb',
+            3 => 'realisasi_mar',
+            4 => 'realisasi_apr',
+            5 => 'realisasi_mei',
+            6 => 'realisasi_jun',
+            7 => 'realisasi_jul',
+            8 => 'realisasi_agu',
+            9 => 'realisasi_sep',
+            10 => 'realisasi_okt',
+            11 => 'realisasi_nov',
+            12 => 'realisasi_des',
+        ];
+
+        // Get trend data with correct column names
+        $trendData = collect(range(1, 12))->map(function ($month) use ($year, $compareYear, $monthFieldMapping) {
+            $currentField = $monthFieldMapping[$month];
+
+            // Current year realization
+            $currentRealization = BudgetCategory::sum($currentField);
+
+            // Previous year realization (if needed for comparison)
+            $previousRealization = 0; // You can implement this if needed
+
+            // Calculate growth
+            $growth = $previousRealization > 0
+                ? (($currentRealization - $previousRealization) / $previousRealization) * 100
+                : 0;
+
+            return [
+                'month' => $month,
+                'month_name' => $this->getIndonesianMonthName($month),
+                'current_realization' => $currentRealization,
+                'previous_realization' => $previousRealization,
+                'growth_percentage' => $growth,
+            ];
+        });
+
+        $summary = [
+            'total_current' => $trendData->sum('current_realization'),
+            'total_previous' => $trendData->sum('previous_realization'),
+            'average_growth' => $trendData->avg('growth_percentage'),
+            'highest_month' => $trendData->sortByDesc('current_realization')->first(),
+            'lowest_month' => $trendData->sortBy('current_realization')->first(),
+        ];
+
+        if ($request->get('format') === 'pdf') {
+            return view('reports.trend-analysis-pdf', compact('trendData', 'summary', 'year', 'compareYear'));
+        }
+
+        return view('reports.trend-analysis', compact('trendData', 'summary', 'year', 'compareYear'));
     }
 }
