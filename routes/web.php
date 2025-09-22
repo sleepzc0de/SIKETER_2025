@@ -7,6 +7,7 @@ use App\Http\Controllers\BillController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RolePermissionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -84,4 +85,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Budget Realizations
     Route::get('/budget-realizations', [BudgetController::class, 'realizations'])->name('budget.realizations');
     Route::get('/budget-realizations/{id}', [BudgetController::class, 'realizationDetail'])->name('budget.realization-detail')->where('id', '[0-9]+');
+});
+
+// Admin Panel Routes - Role & Permission Management
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+
+    // Roles Management
+    Route::get('/roles', [RolePermissionController::class, 'rolesIndex'])->name('roles.index');
+    Route::get('/roles/create', [RolePermissionController::class, 'rolesCreate'])->name('roles.create');
+    Route::post('/roles', [RolePermissionController::class, 'rolesStore'])->name('roles.store');
+    Route::get('/roles/{id}', [RolePermissionController::class, 'rolesShow'])->name('roles.show')->where('id', '[0-9]+');
+    Route::get('/roles/{id}/edit', [RolePermissionController::class, 'rolesEdit'])->name('roles.edit')->where('id', '[0-9]+');
+    Route::put('/roles/{id}', [RolePermissionController::class, 'rolesUpdate'])->name('roles.update')->where('id', '[0-9]+');
+    Route::delete('/roles/{id}', [RolePermissionController::class, 'rolesDestroy'])->name('roles.destroy')->where('id', '[0-9]+');
+
+    // Permissions Management
+    Route::get('/permissions', [RolePermissionController::class, 'permissionsIndex'])->name('permissions.index');
+    Route::get('/permissions/create', [RolePermissionController::class, 'permissionsCreate'])->name('permissions.create');
+    Route::post('/permissions', [RolePermissionController::class, 'permissionsStore'])->name('permissions.store');
+    Route::get('/permissions/{id}', [RolePermissionController::class, 'permissionsShow'])->name('permissions.show')->where('id', '[0-9]+');
+    Route::get('/permissions/{id}/edit', [RolePermissionController::class, 'permissionsEdit'])->name('permissions.edit')->where('id', '[0-9]+');
+    Route::put('/permissions/{id}', [RolePermissionController::class, 'permissionsUpdate'])->name('permissions.update')->where('id', '[0-9]+');
+    Route::delete('/permissions/{id}', [RolePermissionController::class, 'permissionsDestroy'])->name('permissions.destroy')->where('id', '[0-9]+');
+
+    // User Role Assignment
+    Route::get('/user-roles', [RolePermissionController::class, 'userRoles'])->name('user-roles.index');
+    Route::post('/users/{user}/assign-role', [RolePermissionController::class, 'assignUserRole'])->name('users.assign-role')->where('user', '[0-9]+');
+    Route::delete('/users/{user}/roles/{role}', [RolePermissionController::class, 'removeUserRole'])->name('users.remove-role')->where(['user' => '[0-9]+', 'role' => '[0-9]+']);
+
+    // Bulk Operations
+    Route::post('/bulk-assign-role', [RolePermissionController::class, 'bulkAssignRole'])->name('bulk-assign-role');
+    Route::post('/sync-default-permissions', [RolePermissionController::class, 'syncDefaultPermissions'])->name('sync-permissions');
 });
