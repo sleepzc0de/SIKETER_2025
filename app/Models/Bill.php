@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class Bill extends Model
@@ -11,56 +12,116 @@ class Bill extends Model
     use HasFactory;
 
     protected $fillable = [
-        'bill_number',
-        'budget_category_id',
-        'amount',
-        'description',
-        'status',
-        'sp2d_number',
-        'sp2d_date',
-        'approved_at',
-        'approved_by',
-        'created_by',
+        'no',
         'month',
-        'year',
-        'due_date',
-        'notes'
+        'no_spp',
+        'nominatif',
+        'tgl_spp',
+        'jenis_kegiatan',
+        'kontraktual_type',
+        'nomor_kontrak_spby',
+        'no_bast_kuitansi',
+        'id_e_perjadin',
+        'uraian_spp',
+        'bagian',
+        'nama_pic',
+        'kode_kegiatan',
+        'kro',
+        'ro',
+        'sub_komponen',
+        'mak',
+        'nomor_surat_tugas_bast_sk',
+        'tanggal_st_sk',
+        'nomor_undangan',
+        'bruto',
+        'pajak_ppn',
+        'pajak_pph',
+        'netto',
+        'tanggal_mulai',
+        'tanggal_selesai',
+        'ls_bendahara',
+        'staff_ppk',
+        'no_sp2d',
+        'tgl_selesai_sp2d',
+        'tgl_sp2d',
+        'status',
+        'coa',
+        'posisi_uang',
+        'budget_category_id',
+        'created_by',
+        'updated_by'
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'sp2d_date' => 'date',
-        'approved_at' => 'datetime',
-        'due_date' => 'date',
-        'month' => 'integer',
-        'year' => 'integer'
+        'tgl_spp' => 'date',
+        'tanggal_st_sk' => 'date',
+        'tanggal_mulai' => 'date',
+        'tanggal_selesai' => 'date',
+        'tgl_selesai_sp2d' => 'date',
+        'tgl_sp2d' => 'date',
+        'bruto' => 'decimal:2',
+        'pajak_ppn' => 'decimal:2',
+        'pajak_pph' => 'decimal:2',
+        'netto' => 'decimal:2',
     ];
 
     protected static function boot()
     {
         parent::boot();
 
-        static::creating(function ($bill) {
-            // Auto-generate bill number if not provided
-            if (!$bill->bill_number) {
-                $bill->bill_number = 'BILL-' . date('Y') . '-' . str_pad(static::count() + 1, 6, '0', STR_PAD_LEFT);
-            }
+        static::saving(function ($bill) {
+            // Auto-calculate netto
+            $bill->netto = $bill->bruto - $bill->pajak_ppn - $bill->pajak_pph;
 
-            // Set month and year from created_at if not provided
-            if (!$bill->month) {
-                $bill->month = Carbon::now()->month;
+            // Auto-generate COA
+            if ($bill->kode_kegiatan && $bill->kro && $bill->ro && $bill->sub_komponen && $bill->mak) {
+                $bill->coa = $bill->kode_kegiatan . $bill->kro . $bill->ro . $bill->sub_komponen . $bill->mak;
             }
-            if (!$bill->year) {
-                $bill->year = Carbon::now()->year;
+        });
+
+        static::saved(function ($bill) {
+            // Update budget realization when status is SP2D
+            if ($bill->status === 'Tagihan Telah SP2D' && $bill->budget_category_id) {
+                $bill->updateBudgetRealization();
             }
         });
 
         static::updated(function ($bill) {
-            // Update budget category realization when bill status changes
-            if ($bill->isDirty('status') && $bill->budgetCategory) {
-                $bill->budgetCategory->updateRealization();
+            // Handle status change to SP2D
+            if ($bill->wasChanged('status') && $bill->status === 'Tagihan Telah SP2D') {
+                $bill->updateBudgetRealization();
+            }
+
+            // Handle status change from SP2D
+            if ($bill->wasChanged('status') && $bill->getOriginal('status') === 'Tagihan Telah SP2D') {
+                $bill->updateBudgetRealization();
             }
         });
+
+        static::deleted(function ($bill) {
+            // Update budget realization when bill is deleted
+            if ($bill->budget_category_id) {
+                $bill->updateBudgetRealization();
+            }
+        });
+    }
+
+    public function updateBudgetRealization()
+    {
+        if (!$this->budget_category_id) return;
+
+        try {
+            $budget = $this->budgetCategory;
+            if ($budget) {
+                $budget->updateRealization();
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to update budget realization', [
+                'bill_id' => $this->id,
+                'budget_category_id' => $this->budget_category_id,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     // Relationships
@@ -74,65 +135,139 @@ class Bill extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function approver()
+    public function updater()
     {
-        return $this->belongsTo(User::class, 'approved_by');
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    // Accessors
+    public function getTglSppFormattedAttribute()
+    {
+        return $this->tgl_spp ? $this->tgl_spp->format('d F Y') : null;
+    }
+
+    public function getTglSp2dFormattedAttribute()
+    {
+        return $this->tgl_sp2d ? $this->tgl_sp2d->format('d F Y') : null;
+    }
+
+    public function getTglSelesaiSp2dFormattedAttribute()
+    {
+        return $this->tgl_selesai_sp2d ? $this->tgl_selesai_sp2d->format('d F Y') : null;
+    }
+
+    public function getStatusColorAttribute()
+    {
+        return match($this->status) {
+            'Kegiatan Masih Berlangsung' => 'bg-blue-100 text-blue-800',
+            'Tagihan Belum Disampaikan oleh Pihak Terkait' => 'bg-yellow-100 text-yellow-800',
+            'Tagihan Telah Disampaikan oleh Pihak Terkait' => 'bg-orange-100 text-orange-800',
+            'Tagihan Telah Diterbitkan SPP' => 'bg-purple-100 text-purple-800',
+            'Tagihan Telah SP2D' => 'bg-green-100 text-green-800',
+            default => 'bg-gray-100 text-gray-800'
+        };
     }
 
     // Scopes
-    public function scopePending($query)
-    {
-        return $query->where('status', 'pending');
-    }
-
-    public function scopeApproved($query)
-    {
-        return $query->where('status', 'sp2d');
-    }
-
-    public function scopeCancelled($query)
-    {
-        return $query->where('status', 'cancelled');
-    }
-
-    public function scopeByYear($query, $year)
-    {
-        return $query->where('year', $year);
-    }
-
     public function scopeByMonth($query, $month)
     {
         return $query->where('month', $month);
     }
 
-    // Accessors
-    public function getStatusLabelAttribute()
+    public function scopeByStatus($query, $status)
     {
-        return [
-            'pending' => 'Menunggu Persetujuan',
-            'sp2d' => 'Sudah SP2D',
-            'cancelled' => 'Dibatalkan'
-        ][$this->status] ?? 'Unknown';
+        return $query->where('status', $status);
     }
 
-    public function getStatusColorAttribute()
+    public function scopeByBudgetCategory($query, $budgetCategoryId)
     {
-        return [
-            'pending' => 'yellow',
-            'sp2d' => 'green',
-            'cancelled' => 'red'
-        ][$this->status] ?? 'gray';
+        return $query->where('budget_category_id', $budgetCategoryId);
     }
 
-    public function getMonthNameAttribute()
+    public function scopeSearch($query, $search)
     {
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret',
-            4 => 'April', 5 => 'Mei', 6 => 'Juni',
-            7 => 'Juli', 8 => 'Agustus', 9 => 'September',
-            10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        return $query->where(function ($q) use ($search) {
+            $q->where('no_spp', 'ILIKE', "%{$search}%")
+              ->orWhere('nominatif', 'ILIKE', "%{$search}%")
+              ->orWhere('uraian_spp', 'ILIKE', "%{$search}%")
+              ->orWhere('nama_pic', 'ILIKE', "%{$search}%")
+              ->orWhere('nomor_kontrak_spby', 'ILIKE', "%{$search}%");
+        });
+    }
+
+    // Static methods
+    public static function getMonthOptions()
+    {
+        return [
+            'Januari' => 'Januari',
+            'Februari' => 'Februari',
+            'Maret' => 'Maret',
+            'April' => 'April',
+            'Mei' => 'Mei',
+            'Juni' => 'Juni',
+            'Juli' => 'Juli',
+            'Agustus' => 'Agustus',
+            'September' => 'September',
+            'Oktober' => 'Oktober',
+            'November' => 'November',
+            'Desember' => 'Desember',
         ];
+    }
 
-        return $monthNames[$this->month] ?? 'Unknown';
+    public static function getBagianOptions()
+    {
+        return [
+            'TU' => 'TU',
+            'Persija' => 'Persija',
+            'MP' => 'MP',
+            'Pengelolaan' => 'Pengelolaan',
+            'Perencanaan' => 'Perencanaan',
+            'Penat' => 'Penat',
+        ];
+    }
+
+    public static function getKontraktualTypeOptions()
+    {
+        return [
+            'Kontraktual' => 'Kontraktual',
+            'Non Kontraktual' => 'Non Kontraktual',
+            'GUP' => 'GUP',
+            'TUP' => 'TUP',
+        ];
+    }
+
+    public static function getLsBendaharaOptions()
+    {
+        return [
+            'LS' => 'LS',
+            'Bendahara' => 'Bendahara',
+        ];
+    }
+
+    public static function getStaffPpkOptions()
+    {
+        return [
+            'Diaz' => 'Diaz',
+            'Nomo' => 'Nomo',
+        ];
+    }
+
+    public static function getStatusOptions()
+    {
+        return [
+            'Kegiatan Masih Berlangsung' => 'Kegiatan Masih Berlangsung',
+            'Tagihan Belum Disampaikan oleh Pihak Terkait' => 'Tagihan Belum Disampaikan oleh Pihak Terkait',
+            'Tagihan Telah Disampaikan oleh Pihak Terkait' => 'Tagihan Telah Disampaikan oleh Pihak Terkait',
+            'Tagihan Telah Diterbitkan SPP' => 'Tagihan Telah Diterbitkan SPP',
+            'Tagihan Telah SP2D' => 'Tagihan Telah SP2D',
+        ];
+    }
+
+    public static function getPosisiUangOptions()
+    {
+        return [
+            'Bendahara' => 'Bendahara',
+            'Penerima' => 'Penerima',
+        ];
     }
 }
