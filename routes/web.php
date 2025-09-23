@@ -30,6 +30,8 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 // Protected Routes
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/realtime-data', [DashboardController::class, 'getRealtimeData'])->name('dashboard.realtime-data');
+
 
     // Budget Management - Read access for all authenticated users
     Route::get('/budget', [BudgetController::class, 'index'])->name('budget.index');

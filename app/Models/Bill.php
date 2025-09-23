@@ -4,69 +4,63 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class Bill extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'budget_category_id',
         'bill_number',
+        'budget_category_id',
         'amount',
+        'description',
+        'status',
+        'sp2d_number',
+        'sp2d_date',
+        'approved_at',
+        'approved_by',
+        'created_by',
         'month',
         'year',
-        'bill_date',
-        'status',
-        'sp2d_date',
-        'sp2d_number',
-        'description',
-        'created_by',
-        'approved_by',
-        'approved_at',
+        'due_date',
+        'notes'
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
-        'bill_date' => 'date',
         'sp2d_date' => 'date',
         'approved_at' => 'datetime',
+        'due_date' => 'date',
+        'month' => 'integer',
+        'year' => 'integer'
     ];
 
-    protected static function booted()
+    protected static function boot()
     {
-        static::saved(function ($bill) {
-            $bill->budgetCategory->updateRealization();
-            Cache::tags(['budget_stats'])->flush();
+        parent::boot();
+
+        static::creating(function ($bill) {
+            // Auto-generate bill number if not provided
+            if (!$bill->bill_number) {
+                $bill->bill_number = 'BILL-' . date('Y') . '-' . str_pad(static::count() + 1, 6, '0', STR_PAD_LEFT);
+            }
+
+            // Set month and year from created_at if not provided
+            if (!$bill->month) {
+                $bill->month = Carbon::now()->month;
+            }
+            if (!$bill->year) {
+                $bill->year = Carbon::now()->year;
+            }
         });
 
-        static::deleted(function ($bill) {
-            $bill->budgetCategory->updateRealization();
-            Cache::tags(['budget_stats'])->flush();
+        static::updated(function ($bill) {
+            // Update budget category realization when bill status changes
+            if ($bill->isDirty('status') && $bill->budgetCategory) {
+                $bill->budgetCategory->updateRealization();
+            }
         });
-    }
-
-    public function getMonthNameAttribute()
-    {
-        $months = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret',
-            4 => 'April', 5 => 'Mei', 6 => 'Juni',
-            7 => 'Juli', 8 => 'Agustus', 9 => 'September',
-            10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-        ];
-
-        return $months[$this->month] ?? '';
-    }
-
-    public function getStatusBadgeAttribute()
-    {
-        $badges = [
-            'pending' => '<span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Pending</span>',
-            'sp2d' => '<span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">SP2D</span>',
-            'cancelled' => '<span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Dibatalkan</span>',
-        ];
-
-        return $badges[$this->status] ?? '';
     }
 
     // Relationships
@@ -91,22 +85,54 @@ class Bill extends Model
         return $query->where('status', 'pending');
     }
 
-    public function scopeSP2D($query)
+    public function scopeApproved($query)
     {
         return $query->where('status', 'sp2d');
     }
 
-    public function scopeByMonth($query, $month, $year = null)
+    public function scopeCancelled($query)
     {
-        $query = $query->where('month', $month);
-        if ($year) {
-            $query->where('year', $year);
-        }
-        return $query;
+        return $query->where('status', 'cancelled');
     }
 
     public function scopeByYear($query, $year)
     {
         return $query->where('year', $year);
+    }
+
+    public function scopeByMonth($query, $month)
+    {
+        return $query->where('month', $month);
+    }
+
+    // Accessors
+    public function getStatusLabelAttribute()
+    {
+        return [
+            'pending' => 'Menunggu Persetujuan',
+            'sp2d' => 'Sudah SP2D',
+            'cancelled' => 'Dibatalkan'
+        ][$this->status] ?? 'Unknown';
+    }
+
+    public function getStatusColorAttribute()
+    {
+        return [
+            'pending' => 'yellow',
+            'sp2d' => 'green',
+            'cancelled' => 'red'
+        ][$this->status] ?? 'gray';
+    }
+
+    public function getMonthNameAttribute()
+    {
+        $monthNames = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret',
+            4 => 'April', 5 => 'Mei', 6 => 'Juni',
+            7 => 'Juli', 8 => 'Agustus', 9 => 'September',
+            10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+
+        return $monthNames[$this->month] ?? 'Unknown';
     }
 }
