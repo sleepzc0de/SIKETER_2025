@@ -1,5 +1,4 @@
 @extends('layouts.app')
-
 @section('content')
 <div class="max-w-6xl mx-auto" x-data="billManager()" x-init="init()">
     <!-- Header -->
@@ -33,7 +32,7 @@
                 <h3 class="text-lg font-medium text-gray-900">Informasi Dasar</h3>
             </div>
             <div class="px-6 py-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-               <!-- No -->
+                <!-- No -->
                 <div>
                     <label for="no" class="block text-sm font-medium text-gray-700">No</label>
                     <input type="text" name="no" id="no" value="{{ old('no') }}"
@@ -49,8 +48,8 @@
                     <select name="month" id="month" required
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('month') border-red-300 @enderror">
                         <option value="">Pilih Bulan</option>
-                        @foreach($months as $value => $label)
-                            <option value="{{ $value }}" {{ old('month') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($months as $key => $value)
+                            <option value="{{ $key }}" {{ old('month') == $key ? 'selected' : '' }}>{{ $value }}</option>
                         @endforeach
                     </select>
                     @error('month')
@@ -108,12 +107,12 @@
             <div class="px-6 py-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <!-- Kontraktual Type -->
                 <div>
-                    <label for="kontraktual_type" class="block text-sm font-medium text-gray-700">Kontraktual/Non Kontraktual/GUP/TUP</label>
+                    <label for="kontraktual_type" class="block text-sm font-medium text-gray-700">Jenis Kontrak</label>
                     <select name="kontraktual_type" id="kontraktual_type"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('kontraktual_type') border-red-300 @enderror">
                         <option value="">Pilih Jenis</option>
-                        @foreach($kontraktualTypes as $value => $label)
-                            <option value="{{ $value }}" {{ old('kontraktual_type') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($kontraktualTypes as $key => $value)
+                            <option value="{{ $key }}" {{ old('kontraktual_type', $existingBill->kontraktual_type ?? '') == $key ? 'selected' : '' }}>{{ $value }}</option>
                         @endforeach
                     </select>
                     @error('kontraktual_type')
@@ -123,8 +122,8 @@
 
                 <!-- Nomor Kontrak/SPBy -->
                 <div>
-                    <label for="nomor_kontrak_spby" class="block text-sm font-medium text-gray-700">Nomor Kontrak/Nomor SPBy</label>
-                    <input type="text" name="nomor_kontrak_spby" id="nomor_kontrak_spby" value="{{ old('nomor_kontrak_spby') }}"
+                    <label for="nomor_kontrak_spby" class="block text-sm font-medium text-gray-700">Nomor Kontrak/SPBy</label>
+                    <input type="text" name="nomor_kontrak_spby" id="nomor_kontrak_spby" value="{{ old('nomor_kontrak_spby', $existingBill->nomor_kontrak_spby ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('nomor_kontrak_spby') border-red-300 @enderror">
                     @error('nomor_kontrak_spby')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -134,7 +133,7 @@
                 <!-- No BAST/Kuitansi -->
                 <div>
                     <label for="no_bast_kuitansi" class="block text-sm font-medium text-gray-700">No BAST/Kuitansi</label>
-                    <input type="text" name="no_bast_kuitansi" id="no_bast_kuitansi" value="{{ old('no_bast_kuitansi') }}"
+                    <input type="text" name="no_bast_kuitansi" id="no_bast_kuitansi" value="{{ old('no_bast_kuitansi', $existingBill->no_bast_kuitansi ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('no_bast_kuitansi') border-red-300 @enderror">
                     @error('no_bast_kuitansi')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -144,7 +143,7 @@
                 <!-- ID e-Perjadin -->
                 <div>
                     <label for="id_e_perjadin" class="block text-sm font-medium text-gray-700">ID e-Perjadin</label>
-                    <input type="text" name="id_e_perjadin" id="id_e_perjadin" value="{{ old('id_e_perjadin') }}"
+                    <input type="text" name="id_e_perjadin" id="id_e_perjadin" value="{{ old('id_e_perjadin', $existingBill->id_e_perjadin ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('id_e_perjadin') border-red-300 @enderror">
                     @error('id_e_perjadin')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -153,8 +152,8 @@
 
                 <!-- Nomor Surat Tugas/BAST/SK -->
                 <div>
-                    <label for="nomor_surat_tugas_bast_sk" class="block text-sm font-medium text-gray-700">Nomor Surat Tugas/Nomor BAST/Nomor SK</label>
-                    <input type="text" name="nomor_surat_tugas_bast_sk" id="nomor_surat_tugas_bast_sk" value="{{ old('nomor_surat_tugas_bast_sk') }}"
+                    <label for="nomor_surat_tugas_bast_sk" class="block text-sm font-medium text-gray-700">Nomor Surat Tugas/BAST/SK</label>
+                    <input type="text" name="nomor_surat_tugas_bast_sk" id="nomor_surat_tugas_bast_sk" value="{{ old('nomor_surat_tugas_bast_sk', $existingBill->nomor_surat_tugas_bast_sk ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('nomor_surat_tugas_bast_sk') border-red-300 @enderror">
                     @error('nomor_surat_tugas_bast_sk')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -164,7 +163,7 @@
                 <!-- Tanggal ST/SK -->
                 <div>
                     <label for="tanggal_st_sk" class="block text-sm font-medium text-gray-700">Tanggal ST/SK</label>
-                    <input type="date" name="tanggal_st_sk" id="tanggal_st_sk" value="{{ old('tanggal_st_sk') }}"
+                    <input type="date" name="tanggal_st_sk" id="tanggal_st_sk" value="{{ old('tanggal_st_sk', $existingBill->tanggal_st_sk ? $existingBill->tanggal_st_sk->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tanggal_st_sk') border-red-300 @enderror">
                     @error('tanggal_st_sk')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -173,8 +172,8 @@
 
                 <!-- Nomor Undangan -->
                 <div>
-                    <label for="nomor_undangan" class="block text-sm font-medium text-gray-700">Nomor Undangan (Jika Ada)</label>
-                    <input type="text" name="nomor_undangan" id="nomor_undangan" value="{{ old('nomor_undangan') }}"
+                    <label for="nomor_undangan" class="block text-sm font-medium text-gray-700">Nomor Undangan</label>
+                    <input type="text" name="nomor_undangan" id="nomor_undangan" value="{{ old('nomor_undangan', $existingBill->nomor_undangan ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('nomor_undangan') border-red-300 @enderror">
                     @error('nomor_undangan')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -187,7 +186,7 @@
                 <label for="uraian_spp" class="block text-sm font-medium text-gray-700">Uraian SPP</label>
                 <textarea name="uraian_spp" id="uraian_spp" rows="3"
                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('uraian_spp') border-red-300 @enderror"
-                          placeholder="Masukkan uraian lengkap SPP...">{{ old('uraian_spp') }}</textarea>
+                          placeholder="Masukkan uraian lengkap SPP...">{{ old('uraian_spp', $existingBill->uraian_spp ?? '') }}</textarea>
                 @error('uraian_spp')
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror
@@ -206,8 +205,8 @@
                     <select name="bagian" id="bagian"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('bagian') border-red-300 @enderror">
                         <option value="">Pilih Bagian</option>
-                        @foreach($bagians as $value => $label)
-                            <option value="{{ $value }}" {{ old('bagian', $existingBill->bagian ?? '') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($bagians as $key => $value)
+                            <option value="{{ $key }}" {{ old('bagian', $existingBill->bagian ?? '') == $key ? 'selected' : '' }}>{{ $value }}</option>
                         @endforeach
                     </select>
                     @error('bagian')
@@ -290,9 +289,10 @@
 
                 <!-- COA (Auto-generated) -->
                 <div>
-                    <label for="coa" class="block text-sm font-medium text-gray-700">COA (Auto-generated)</label>
-                    <input type="text" name="coa" id="coa" x-model="coa" readonly
+                    <label for="coa_display" class="block text-sm font-medium text-gray-700">COA (Auto-generated)</label>
+                    <input type="text" id="coa_display" x-model="coa" readonly
                            class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm sm:text-sm">
+                    <input type="hidden" name="coa" :value="coa">
                     <p class="mt-1 text-xs text-gray-500">Otomatis: Kode Kegiatan + KRO + RO + Sub Komponen + MAK</p>
                 </div>
             </div>
@@ -307,7 +307,7 @@
                 <!-- Bruto -->
                 <div>
                     <label for="bruto" class="block text-sm font-medium text-gray-700">Bruto (Rp)</label>
-                    <input type="number" name="bruto" id="bruto" value="{{ old('bruto', 0) }}" step="0.01" min="0"
+                    <input type="number" name="bruto" id="bruto" value="{{ old('bruto', $existingBill->bruto ?? 0) }}" step="0.01" min="0"
                            @input="calculateNetto()"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('bruto') border-red-300 @enderror">
                     @error('bruto')
@@ -318,7 +318,7 @@
                 <!-- Pajak PPN -->
                 <div>
                     <label for="pajak_ppn" class="block text-sm font-medium text-gray-700">Pajak PPN (Rp)</label>
-                    <input type="number" name="pajak_ppn" id="pajak_ppn" value="{{ old('pajak_ppn', 0) }}" step="0.01" min="0"
+                    <input type="number" name="pajak_ppn" id="pajak_ppn" value="{{ old('pajak_ppn', $existingBill->pajak_ppn ?? 0) }}" step="0.01" min="0"
                            @input="calculateNetto()"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('pajak_ppn') border-red-300 @enderror">
                     @error('pajak_ppn')
@@ -329,7 +329,7 @@
                 <!-- Pajak PPH -->
                 <div>
                     <label for="pajak_pph" class="block text-sm font-medium text-gray-700">Pajak PPH (Rp)</label>
-                    <input type="number" name="pajak_pph" id="pajak_pph" value="{{ old('pajak_pph', 0) }}" step="0.01" min="0"
+                    <input type="number" name="pajak_pph" id="pajak_pph" value="{{ old('pajak_pph', $existingBill->pajak_pph ?? 0) }}" step="0.01" min="0"
                            @input="calculateNetto()"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('pajak_pph') border-red-300 @enderror">
                     @error('pajak_pph')
@@ -339,16 +339,18 @@
 
                 <!-- Netto (Auto-calculated) -->
                 <div>
-                    <label for="netto" class="block text-sm font-medium text-gray-700">Netto (Auto-calculated)</label>
-                    <input type="number" name="netto" id="netto" x-model="netto" readonly step="0.01"
+                    <label for="netto_display" class="block text-sm font-medium text-gray-700">Netto (Auto-calculated)</label>
+                    <input type="number" id="netto_display" x-model="netto" readonly step="0.01"
                            class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm sm:text-sm">
+                    <input type="hidden" name="netto" :value="netto">
+                    <input type="hidden" name="amount" :value="netto">
                     <p class="mt-1 text-xs text-gray-500">Bruto - PPN - PPH</p>
                 </div>
 
                 <!-- Tanggal Mulai -->
                 <div>
                     <label for="tanggal_mulai" class="block text-sm font-medium text-gray-700">Tanggal Mulai</label>
-                    <input type="date" name="tanggal_mulai" id="tanggal_mulai" value="{{ old('tanggal_mulai') }}"
+                    <input type="date" name="tanggal_mulai" id="tanggal_mulai" value="{{ old('tanggal_mulai', $existingBill->tanggal_mulai ? $existingBill->tanggal_mulai->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tanggal_mulai') border-red-300 @enderror">
                     @error('tanggal_mulai')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -358,7 +360,7 @@
                 <!-- Tanggal Selesai -->
                 <div>
                     <label for="tanggal_selesai" class="block text-sm font-medium text-gray-700">Tanggal Selesai</label>
-                    <input type="date" name="tanggal_selesai" id="tanggal_selesai" value="{{ old('tanggal_selesai') }}"
+                    <input type="date" name="tanggal_selesai" id="tanggal_selesai" value="{{ old('tanggal_selesai', $existingBill->tanggal_selesai ? $existingBill->tanggal_selesai->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tanggal_selesai') border-red-300 @enderror">
                     @error('tanggal_selesai')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -371,8 +373,8 @@
                     <select name="ls_bendahara" id="ls_bendahara"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('ls_bendahara') border-red-300 @enderror">
                         <option value="">Pilih LS/Bendahara</option>
-                        @foreach($lsBendaharaOptions as $value => $label)
-                            <option value="{{ $value }}" {{ old('ls_bendahara') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($lsBendaharaOptions as $key => $value)
+                            <option value="{{ $key }}" {{ old('ls_bendahara', $existingBill->ls_bendahara ?? '') == $key ? 'selected' : '' }}>{{ $value }}</option>
                         @endforeach
                     </select>
                     @error('ls_bendahara')
@@ -386,8 +388,8 @@
                     <select name="staff_ppk" id="staff_ppk"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('staff_ppk') border-red-300 @enderror">
                         <option value="">Pilih Staff PPK</option>
-                        @foreach($staffPpkOptions as $value => $label)
-                            <option value="{{ $value }}" {{ old('staff_ppk') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($staffPpkOptions as $key => $value)
+                            <option value="{{ $key }}" {{ old('staff_ppk', $existingBill->staff_ppk ?? '') == $key ? 'selected' : '' }}>{{ $value }}</option>
                         @endforeach
                     </select>
                     @error('staff_ppk')
@@ -403,10 +405,24 @@
                 <h3 class="text-lg font-medium text-gray-900">Informasi Pembayaran</h3>
             </div>
             <div class="px-6 py-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <!-- Status -->
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>
+                    <select name="status" id="status" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('status') border-red-300 @enderror">
+                        @foreach($statusOptions as $key => $value)
+                            <option value="{{ $key }}" {{ old('status', 'Kegiatan Masih Berlangsung') == $key ? 'selected' : '' }}>{{ $value }}</option>
+                        @endforeach
+                    </select>
+                    @error('status')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 <!-- No SP2D -->
                 <div>
                     <label for="no_sp2d" class="block text-sm font-medium text-gray-700">No SP2D</label>
-                    <input type="text" name="no_sp2d" id="no_sp2d" value="{{ old('no_sp2d') }}"
+                    <input type="text" name="no_sp2d" id="no_sp2d" value="{{ old('no_sp2d', $existingBill->no_sp2d ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('no_sp2d') border-red-300 @enderror">
                     @error('no_sp2d')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -416,7 +432,7 @@
                 <!-- Tgl Selesai SP2D -->
                 <div>
                     <label for="tgl_selesai_sp2d" class="block text-sm font-medium text-gray-700">Tgl Selesai SP2D</label>
-                    <input type="date" name="tgl_selesai_sp2d" id="tgl_selesai_sp2d" value="{{ old('tgl_selesai_sp2d') }}"
+                    <input type="date" name="tgl_selesai_sp2d" id="tgl_selesai_sp2d" value="{{ old('tgl_selesai_sp2d', $existingBill->tgl_selesai_sp2d ? $existingBill->tgl_selesai_sp2d->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tgl_selesai_sp2d') border-red-300 @enderror">
                     @error('tgl_selesai_sp2d')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -426,23 +442,9 @@
                 <!-- Tgl SP2D -->
                 <div>
                     <label for="tgl_sp2d" class="block text-sm font-medium text-gray-700">Tgl SP2D</label>
-                    <input type="date" name="tgl_sp2d" id="tgl_sp2d" value="{{ old('tgl_sp2d') }}"
+                    <input type="date" name="tgl_sp2d" id="tgl_sp2d" value="{{ old('tgl_sp2d', $existingBill->tgl_sp2d ? $existingBill->tgl_sp2d->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tgl_sp2d') border-red-300 @enderror">
                     @error('tgl_sp2d')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <!-- Status -->
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>
-                    <select name="status" id="status" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('status') border-red-300 @enderror">
-                        @foreach($statusOptions as $value => $label)
-                            <option value="{{ $value }}" {{ old('status', 'Kegiatan Masih Berlangsung') == $value ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    @error('status')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
@@ -453,8 +455,8 @@
                     <select name="posisi_uang" id="posisi_uang"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('posisi_uang') border-red-300 @enderror">
                         <option value="">Pilih Posisi Uang</option>
-                        @foreach($posisiUangOptions as $value => $label)
-                            <option value="{{ $value }}" {{ old('posisi_uang') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($posisiUangOptions as $key => $value)
+                            <option value="{{ $key }}" {{ old('posisi_uang', $existingBill->posisi_uang ?? '') == $key ? 'selected' : '' }}>{{ $value }}</option>
                         @endforeach
                     </select>
                     @error('posisi_uang')
@@ -513,7 +515,8 @@ function billManager() {
         subKomponen: '{{ old("sub_komponen", $existingBill->sub_komponen ?? "") }}',
         mak: '{{ old("mak", $existingBill->mak ?? "") }}',
         coa: '{{ old("coa", $existingBill->coa ?? "") }}',
-        netto: {{ old('netto', 0) }},
+        netto: {{ old('netto', $existingBill->netto ?? 0) }},
+        loading: false,
 
         init() {
             this.calculateNetto();
@@ -539,7 +542,10 @@ function billManager() {
             }
 
             try {
+                this.loading = true;
                 const response = await fetch(`{{ route('bills.ajax.kros') }}?kegiatan=${encodeURIComponent(this.kodeKegiatan)}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+
                 const kros = await response.json();
                 this.populateSelect('kro', kros, this.kro);
                 this.clearSelect('ro');
@@ -547,6 +553,9 @@ function billManager() {
                 this.clearSelect('mak');
             } catch (error) {
                 console.error('Error fetching KROs:', error);
+                this.showError('Gagal mengambil data KRO');
+            } finally {
+                this.loading = false;
             }
         },
 
@@ -565,13 +574,19 @@ function billManager() {
             }
 
             try {
+                this.loading = true;
                 const response = await fetch(`{{ route('bills.ajax.ros') }}?kegiatan=${encodeURIComponent(this.kodeKegiatan)}&kro=${encodeURIComponent(this.kro)}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+
                 const ros = await response.json();
                 this.populateSelect('ro', ros, this.ro);
                 this.clearSelect('sub_komponen');
                 this.clearSelect('mak');
             } catch (error) {
                 console.error('Error fetching ROs:', error);
+                this.showError('Gagal mengambil data RO');
+            } finally {
+                this.loading = false;
             }
         },
 
@@ -588,12 +603,18 @@ function billManager() {
             }
 
             try {
+                this.loading = true;
                 const response = await fetch(`{{ route('bills.ajax.sub-komponens') }}?kegiatan=${encodeURIComponent(this.kodeKegiatan)}&kro=${encodeURIComponent(this.kro)}&ro=${encodeURIComponent(this.ro)}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+
                 const subKomponens = await response.json();
                 this.populateSelect('sub_komponen', subKomponens, this.subKomponen);
                 this.clearSelect('mak');
             } catch (error) {
                 console.error('Error fetching Sub Komponens:', error);
+                this.showError('Gagal mengambil data Sub Komponen');
+            } finally {
+                this.loading = false;
             }
         },
 
@@ -608,11 +629,17 @@ function billManager() {
             }
 
             try {
+                this.loading = true;
                 const response = await fetch(`{{ route('bills.ajax.maks') }}?kegiatan=${encodeURIComponent(this.kodeKegiatan)}&kro=${encodeURIComponent(this.kro)}&ro=${encodeURIComponent(this.ro)}&sub_komponen=${encodeURIComponent(this.subKomponen)}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+
                 const maks = await response.json();
                 this.populateSelect('mak', maks, this.mak);
             } catch (error) {
                 console.error('Error fetching MAKs:', error);
+                this.showError('Gagal mengambil data MAK');
+            } finally {
+                this.loading = false;
             }
         },
 
@@ -625,27 +652,45 @@ function billManager() {
             const bruto = parseFloat(document.getElementById('bruto').value) || 0;
             const ppn = parseFloat(document.getElementById('pajak_ppn').value) || 0;
             const pph = parseFloat(document.getElementById('pajak_pph').value) || 0;
-            this.netto = bruto - ppn - pph;
+            this.netto = Math.max(0, bruto - ppn - pph);
         },
 
         populateSelect(selectId, options, selectedValue = '') {
             const select = document.getElementById(selectId);
-            select.innerHTML = `<option value="">Pilih ${selectId.replace('_', ' ').toUpperCase()}</option>`;
+            const label = selectId.replace('_', ' ').toUpperCase();
+            select.innerHTML = `<option value="">Pilih ${label}</option>`;
 
-            options.forEach(option => {
-                const optionElement = document.createElement('option');
-                optionElement.value = option;
-                optionElement.textContent = option;
-                if (option === selectedValue) {
-                    optionElement.selected = true;
-                }
-                select.appendChild(optionElement);
-            });
+            if (Array.isArray(options) && options.length > 0) {
+                options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    if (option === selectedValue) {
+                        optionElement.selected = true;
+                    }
+                    select.appendChild(optionElement);
+                });
+            }
         },
 
         clearSelect(selectId) {
             const select = document.getElementById(selectId);
-            select.innerHTML = `<option value="">Pilih ${selectId.replace('_', ' ').toUpperCase()}</option>`;
+            const label = selectId.replace('_', ' ').toUpperCase();
+            select.innerHTML = `<option value="">Pilih ${label}</option>`;
+        },
+
+        showError(message) {
+            // Simple error notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
         }
     }
 }

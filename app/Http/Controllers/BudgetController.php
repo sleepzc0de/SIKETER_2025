@@ -1,14 +1,13 @@
 <?php
+// app/Http/Controllers/BudgetController.php
 
 namespace App\Http\Controllers;
 
 use App\Models\BudgetCategory;
 use App\Models\Bill;
-use App\Models\BudgetRealization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\BudgetExport;
@@ -17,76 +16,152 @@ class BudgetController extends Controller
 {
     public function index(Request $request)
     {
-        $query = BudgetCategory::query();
+        try {
+            $query = BudgetCategory::query();
 
-        if ($request->filled('search')) {
-            $query->search($request->search);
+            if ($request->filled('search')) {
+                $query->search($request->search);
+            }
+
+            if ($request->filled('pic')) {
+                $query->byPIC($request->pic);
+            }
+
+            if ($request->filled('kegiatan')) {
+                $query->where('kegiatan', $request->kegiatan);
+            }
+
+            if ($request->filled('year')) {
+                $query->byYear($request->year);
+            }
+
+            $budgets = $query->orderBy('program_kegiatan_output')->paginate(20);
+            $pics = BudgetCategory::distinct()->pluck('pic')->filter()->sort();
+            $kegiatans = BudgetCategory::distinct()->pluck('kegiatan')->filter()->sort();
+            $years = range(date('Y'), 2020);
+
+            return view('budget.index', compact('budgets', 'pics', 'kegiatans', 'years'));
+        } catch (\Exception $e) {
+            Log::error('Budget index error: ' . $e->getMessage());
+            return view('budget.index', [
+                'budgets' => collect(),
+                'pics' => collect(),
+                'kegiatans' => collect(),
+                'years' => range(date('Y'), 2020)
+            ])->with('error', 'Terjadi kesalahan saat memuat data anggaran.');
         }
-
-        if ($request->filled('pic')) {
-            $query->byPIC($request->pic);
-        }
-
-        if ($request->filled('kegiatan')) {
-            $query->where('kegiatan', $request->kegiatan);
-        }
-
-        $budgets = $query->paginate(20);
-        $pics = BudgetCategory::distinct()->pluck('pic');
-        $kegiatans = BudgetCategory::distinct()->pluck('kegiatan');
-
-        return view('budget.index', compact('budgets', 'pics', 'kegiatans'));
     }
 
-    public function show($id)
+    public function realizations(Request $request)
+    {
+        try {
+            $year = $request->get('year', date('Y'));
+            $search = $request->get('search');
+            $pic = $request->get('pic');
+
+            // Base query
+            $query = BudgetCategory::byYear($year);
+
+            // Apply filters
+            if ($search) {
+                $query->search($search);
+            }
+
+            if ($pic) {
+                $query->byPic($pic);
+            }
+
+            // Get budgets with calculated realization
+            $budgets = $query->orderBy('program_kegiatan_output')
+                ->paginate(15)
+                ->withQueryString();
+
+            // Load bills data for each budget to calculate realization
+            $budgets->getCollection()->transform(function ($budget) {
+                // Ensure we have the full_code
+                if (!$budget->reference) {
+                    $budget->reference = $budget->kegiatan . $budget->kro_code . $budget->ro_code . $budget->initial_code . $budget->account_code;
+                }
+
+                // Get bills yang sesuai dengan COA
+                $sp2dBills = Bill::where('coa', $budget->reference)
+                    ->where('status', 'Tagihan Telah SP2D')
+                    ->sum('amount') ?: 0;
+
+                $outstandingBills = Bill::where('coa', $budget->reference)
+                    ->whereIn('status', [
+                        'Kegiatan Masih Berlangsung',
+                        'SPP Sedang Diproses',
+                        'SPP Sudah Diserahkan ke KPPN'
+                    ])
+                    ->sum('amount') ?: 0;
+
+                $budget->total_penyerapan = $sp2dBills;
+                $budget->tagihan_outstanding = $outstandingBills;
+
+                if (($budget->budget_allocation ?: 0) > 0) {
+                    $budget->realization_percentage = ($budget->total_penyerapan / $budget->budget_allocation) * 100;
+                } else {
+                    $budget->realization_percentage = 0;
+                }
+
+                return $budget;
+            });
+
+            // Get unique PICs for filter
+            $pics = BudgetCategory::byYear($year)
+                ->distinct()
+                ->pluck('pic')
+                ->filter()
+                ->sort()
+                ->values();
+
+            return view('budget.realizations', compact(
+                'budgets',
+                'pics',
+                'year'
+            ));
+
+        } catch (\Exception $e) {
+            Log::error('Error in budget realizations: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan saat memuat data realisasi anggaran.');
+        }
+    }
+
+    public function realizationDetail($id, Request $request)
     {
         try {
             $budget = BudgetCategory::findOrFail($id);
-            $budget->load(['bills.creator', 'bills.approver']);
 
-            $monthlyData = collect([
-                ['month' => 1, 'total' => $budget->realisasi_jan],
-                ['month' => 2, 'total' => $budget->realisasi_feb],
-                ['month' => 3, 'total' => $budget->realisasi_mar],
-                ['month' => 4, 'total' => $budget->realisasi_apr],
-                ['month' => 5, 'total' => $budget->realisasi_mei],
-                ['month' => 6, 'total' => $budget->realisasi_jun],
-                ['month' => 7, 'total' => $budget->realisasi_jul],
-                ['month' => 8, 'total' => $budget->realisasi_agu],
-                ['month' => 9, 'total' => $budget->realisasi_sep],
-                ['month' => 10, 'total' => $budget->realisasi_okt],
-                ['month' => 11, 'total' => $budget->realisasi_nov],
-                ['month' => 12, 'total' => $budget->realisasi_des],
-            ]);
+            // Ensure full_code is available
+            if (!$budget->reference) {
+                $budget->reference = $budget->kegiatan . $budget->kro_code . $budget->ro_code . $budget->initial_code . $budget->account_code;
+                $budget->save();
+            }
 
-            return view('budget.show', compact('budget', 'monthlyData'));
+            // Get bills untuk budget category ini
+            $bills = Bill::where('coa', $budget->reference)
+                ->with(['creator', 'approver'])
+                ->orderBy('tgl_spp', 'desc')
+                ->paginate(20);
+
+            return view('budget.realization-detail', compact('budget', 'bills'));
+
         } catch (\Exception $e) {
-            Log::error('Budget show error', [
-                'id' => $id,
-                'error' => $e->getMessage(),
-                'user_id' => Auth::id()
-            ]);
-
-            return redirect()->route('budget.index')->with('error', 'Data anggaran tidak ditemukan.');
+            Log::error('Error in budget realization detail: ' . $e->getMessage());
+            return redirect()->route('budget.realizations')
+                ->with('error', 'Data anggaran tidak ditemukan.');
         }
-    }
-
-    public function create()
-    {
-        // Check permission
-        if (!Auth::user()->canManageBudget()) {
-            return redirect()->route('budget.index')->with('error', 'Anda tidak memiliki akses untuk menambah data anggaran.');
-        }
-
-        return view('budget.create');
     }
 
     public function store(Request $request)
     {
         try {
             // Check permission
-            if (!Auth::user()->canManageBudget()) {
-                return redirect()->route('budget.index')->with('error', 'Anda tidak memiliki akses untuk menambah data anggaran.');
+            if (!Auth::user()->can('manage_budget')) {
+                return redirect()->route('budget.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk menambah data anggaran.');
             }
 
             $validated = $request->validate([
@@ -98,42 +173,26 @@ class BudgetController extends Controller
                 'program_kegiatan_output' => 'required|string',
                 'pic' => 'required|string|max:255',
                 'budget_allocation' => 'required|numeric|min:0',
-                'reference' => 'required|string',
-                'reference2' => 'nullable|string',
-                'reference_output' => 'nullable|string',
-                'length' => 'required|integer|min:0',
+                'year' => 'nullable|integer|min:2020|max:2030',
             ]);
 
-            // Ensure auto-generated fields are correctly calculated
-            $validated['reference'] = $validated['kegiatan'] . $validated['kro_code'] .
-                $validated['ro_code'] . $validated['initial_code'] .
-                $validated['account_code'];
-            $validated['reference2'] = $validated['kegiatan'] . $validated['kro_code'] .
-                $validated['ro_code'] . $validated['initial_code'];
-            $validated['reference_output'] = $validated['kegiatan'] . $validated['kro_code'] .
-                $validated['ro_code'];
-            $validated['length'] = strlen($validated['reference']);
+            // Set default year if not provided
+            if (!isset($validated['year'])) {
+                $validated['year'] = date('Y');
+            }
 
-            // Calculate initial values
+            // Initialize calculated fields
             $validated['sisa_anggaran'] = $validated['budget_allocation'];
             $validated['total_penyerapan'] = 0;
             $validated['tagihan_outstanding'] = 0;
             $validated['is_active'] = true;
 
-            // Initialize monthly realization to 0
+            // Initialize monthly realization fields to 0
             $monthlyFields = [
-                'realisasi_jan',
-                'realisasi_feb',
-                'realisasi_mar',
-                'realisasi_apr',
-                'realisasi_mei',
-                'realisasi_jun',
-                'realisasi_jul',
-                'realisasi_agu',
-                'realisasi_sep',
-                'realisasi_okt',
-                'realisasi_nov',
-                'realisasi_des'
+                'realisasi_jan', 'realisasi_feb', 'realisasi_mar',
+                'realisasi_apr', 'realisasi_mei', 'realisasi_jun',
+                'realisasi_jul', 'realisasi_agu', 'realisasi_sep',
+                'realisasi_okt', 'realisasi_nov', 'realisasi_des'
             ];
 
             foreach ($monthlyFields as $field) {
@@ -142,56 +201,22 @@ class BudgetController extends Controller
 
             $budget = BudgetCategory::create($validated);
 
-            Log::info('Budget created with auto-generated fields', [
+            Log::info('Budget created successfully', [
                 'budget_id' => $budget->id,
                 'created_by' => Auth::id(),
-                'reference' => $validated['reference'],
-                'reference2' => $validated['reference2'],
-                'reference_output' => $validated['reference_output'],
-                'length' => $validated['length'],
                 'data' => $validated
             ]);
 
-            return redirect()->route('budget.show', $budget->id)->with('success', 'Data anggaran berhasil ditambahkan dengan referensi yang digenerate otomatis.');
+            return redirect()->route('budget.show', $budget->id)
+                ->with('success', 'Data anggaran berhasil ditambahkan.');
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()->withErrors($e->validator)->withInput();
         } catch (\Exception $e) {
-            Log::error('Budget store error', [
-                'error' => $e->getMessage(),
-                'user_id' => Auth::id(),
-                'request_data' => $request->all()
-            ]);
-
-            return redirect()->back()->with('error', 'Gagal menyimpan data anggaran. Silakan coba lagi.')->withInput();
-        }
-    }
-
-    public function edit($id)
-    {
-        try {
-            // Check permission
-            if (!Auth::user()->canManageBudget()) {
-                return redirect()->route('budget.index')->with('error', 'Anda tidak memiliki akses untuk mengedit data anggaran.');
-            }
-
-            $budget = BudgetCategory::findOrFail($id);
-
-            // Log for debugging
-            Log::info('Budget edit accessed', [
-                'budget_id' => $budget->id,
-                'budget_data' => $budget->toArray(),
-                'user_id' => Auth::id()
-            ]);
-
-            return view('budget.edit', compact('budget'));
-        } catch (\Exception $e) {
-            Log::error('Budget edit error', [
-                'id' => $id,
-                'error' => $e->getMessage(),
-                'user_id' => Auth::id()
-            ]);
-
-            return redirect()->route('budget.index')->with('error', 'Data anggaran tidak ditemukan.');
+            Log::error('Budget store error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Gagal menyimpan data anggaran.')
+                ->withInput();
         }
     }
 
@@ -199,19 +224,12 @@ class BudgetController extends Controller
     {
         try {
             // Check permission
-            if (!Auth::user()->canManageBudget()) {
-                return redirect()->route('budget.index')->with('error', 'Anda tidak memiliki akses untuk mengedit data anggaran.');
+            if (!Auth::user()->can('manage_budget')) {
+                return redirect()->route('budget.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk mengedit data anggaran.');
             }
 
             $budget = BudgetCategory::findOrFail($id);
-
-            // Log original data for debugging
-            Log::info('Budget update attempt', [
-                'budget_id' => $budget->id,
-                'original_data' => $budget->toArray(),
-                'request_data' => $request->all(),
-                'user_id' => Auth::id()
-            ]);
 
             $validated = $request->validate([
                 'kegiatan' => 'required|string|max:255',
@@ -222,107 +240,121 @@ class BudgetController extends Controller
                 'program_kegiatan_output' => 'required|string',
                 'pic' => 'required|string|max:255',
                 'budget_allocation' => 'required|numeric|min:0',
-                // Use hidden field values for auto-generated fields
-                'reference_hidden' => 'required|string',
-                'reference2_hidden' => 'required|string',
-                'reference_output_hidden' => 'required|string',
-                'length_hidden' => 'required|integer|min:0',
-            ]);
-
-            // Map hidden field values to actual field names
-            $validated['reference'] = $validated['reference_hidden'];
-            $validated['reference2'] = $validated['reference2_hidden'];
-            $validated['reference_output'] = $validated['reference_output_hidden'];
-            $validated['length'] = $validated['length_hidden'];
-
-            // Remove hidden field keys
-            unset(
-                $validated['reference_hidden'],
-                $validated['reference2_hidden'],
-                $validated['reference_output_hidden'],
-                $validated['length_hidden']
-            );
-
-            // Double-check auto-generated values for consistency
-            $expectedReference = $validated['kegiatan'] . $validated['kro_code'] .
-                $validated['ro_code'] . $validated['initial_code'] .
-                $validated['account_code'];
-            $expectedReference2 = $validated['kegiatan'] . $validated['kro_code'] .
-                $validated['ro_code'] . $validated['initial_code'];
-            $expectedReferenceOutput = $validated['kegiatan'] . $validated['kro_code'] .
-                $validated['ro_code'];
-            $expectedLength = strlen($expectedReference);
-
-            // Override with calculated values to ensure consistency
-            $validated['reference'] = $expectedReference;
-            $validated['reference2'] = $expectedReference2;
-            $validated['reference_output'] = $expectedReferenceOutput;
-            $validated['length'] = $expectedLength;
-
-            Log::info('Auto-generated field validation', [
-                'expected_reference' => $expectedReference,
-                'expected_reference2' => $expectedReference2,
-                'expected_reference_output' => $expectedReferenceOutput,
-                'expected_length' => $expectedLength,
-                'submitted_reference' => $request->input('reference_hidden'),
-                'submitted_reference2' => $request->input('reference2_hidden'),
-                'submitted_reference_output' => $request->input('reference_output_hidden'),
-                'submitted_length' => $request->input('length_hidden'),
+                'year' => 'required|integer|min:2020|max:2030',
             ]);
 
             // Store original budget allocation for comparison
             $originalBudgetAllocation = $budget->budget_allocation;
 
-            // Update the budget using mass assignment
-            $updated = $budget->update($validated);
-
-            if (!$updated) {
-                throw new \Exception('Failed to update budget in database');
-            }
-
-            // Refresh the model to get updated data
-            $budget->refresh();
+            // Update the budget
+            $budget->update($validated);
 
             // Recalculate sisa_anggaran if budget_allocation changed
             if ($originalBudgetAllocation != $budget->budget_allocation) {
-                $budget->sisa_anggaran = $budget->budget_allocation - $budget->total_penyerapan;
+                $budget->sisa_anggaran = $budget->budget_allocation - ($budget->total_penyerapan ?: 0);
                 $budget->save();
             }
 
             // Update realization data to ensure consistency
             $budget->updateRealization();
 
-            // Clear relevant caches
-            Cache::forget("budget_{$budget->id}_total_realization");
-            Cache::forget("budget_{$budget->id}_realization_percentage");
-            Cache::forget("budget_{$budget->id}_remaining_budget");
-            Cache::tags(['budget_stats'])->flush();
-
             Log::info('Budget updated successfully', [
                 'budget_id' => $budget->id,
-                'updated_data' => $budget->fresh()->toArray(),
-                'user_id' => Auth::id()
+                'updated_by' => Auth::id()
             ]);
 
-            return redirect()->route('budget.show', $budget->id)->with('success', 'Data anggaran berhasil diperbarui. Field referensi telah dihitung otomatis.');
+            return redirect()->route('budget.show', $budget->id)
+                ->with('success', 'Data anggaran berhasil diperbarui.');
+
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::warning('Budget update validation failed', [
-                'budget_id' => $id,
-                'validation_errors' => $e->validator->errors(),
-                'user_id' => Auth::id()
-            ]);
-
             return redirect()->back()->withErrors($e->validator)->withInput();
         } catch (\Exception $e) {
-            Log::error('Budget update error', [
-                'budget_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => Auth::id(),
-                'request_data' => $request->all()
+            Log::error('Budget update error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Gagal memperbarui data anggaran.')
+                ->withInput();
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $budget = BudgetCategory::findOrFail($id);
+
+            // Ensure we have full_code
+            if (!$budget->reference) {
+                $budget->reference = $budget->kegiatan . $budget->kro_code . $budget->ro_code . $budget->initial_code . $budget->account_code;
+                $budget->save();
+            }
+
+            // Get related bills
+            $bills = Bill::where('coa', $budget->reference)
+                ->with(['creator', 'approver'])
+                ->orderBy('tgl_spp', 'desc')
+                ->paginate(10);
+
+            $monthlyData = collect([
+                ['month' => 1, 'name' => 'Januari', 'total' => $budget->realisasi_jan],
+                ['month' => 2, 'name' => 'Februari', 'total' => $budget->realisasi_feb],
+                ['month' => 3, 'name' => 'Maret', 'total' => $budget->realisasi_mar],
+                ['month' => 4, 'name' => 'April', 'total' => $budget->realisasi_apr],
+                ['month' => 5, 'name' => 'Mei', 'total' => $budget->realisasi_mei],
+                ['month' => 6, 'name' => 'Juni', 'total' => $budget->realisasi_jun],
+                ['month' => 7, 'name' => 'Juli', 'total' => $budget->realisasi_jul],
+                ['month' => 8, 'name' => 'Agustus', 'total' => $budget->realisasi_agu],
+                ['month' => 9, 'name' => 'September', 'total' => $budget->realisasi_sep],
+                ['month' => 10, 'name' => 'Oktober', 'total' => $budget->realisasi_okt],
+                ['month' => 11, 'name' => 'November', 'total' => $budget->realisasi_nov],
+                ['month' => 12, 'name' => 'Desember', 'total' => $budget->realisasi_des],
             ]);
 
-            return redirect()->back()->with('error', 'Gagal memperbarui data anggaran: ' . $e->getMessage())->withInput();
+            return view('budget.show', compact('budget', 'monthlyData', 'bills'));
+
+        } catch (\Exception $e) {
+            Log::error('Budget show error: ' . $e->getMessage());
+            return redirect()->route('budget.index')
+                ->with('error', 'Data anggaran tidak ditemukan.');
+        }
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            return Excel::download(new BudgetExport($request->all()), 'budget-data-' . date('Y-m-d') . '.xlsx');
+        } catch (\Exception $e) {
+            Log::error('Budget export error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Gagal mengekspor data anggaran.');
+        }
+    }
+
+    public function create()
+    {
+        // Check permission
+        if (!Auth::user()->can('manage_budget')) {
+            return redirect()->route('budget.index')
+                ->with('error', 'Anda tidak memiliki akses untuk menambah data anggaran.');
+        }
+
+        return view('budget.create');
+    }
+
+    public function edit($id)
+    {
+        try {
+            // Check permission
+            if (!Auth::user()->can('manage_budget')) {
+                return redirect()->route('budget.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk mengedit data anggaran.');
+            }
+
+            $budget = BudgetCategory::findOrFail($id);
+            return view('budget.edit', compact('budget'));
+
+        } catch (\Exception $e) {
+            Log::error('Budget edit error: ' . $e->getMessage());
+            return redirect()->route('budget.index')
+                ->with('error', 'Data anggaran tidak ditemukan.');
         }
     }
 
@@ -332,12 +364,15 @@ class BudgetController extends Controller
             $budget = BudgetCategory::findOrFail($id);
 
             // Authorization check
-            if (!Auth::user()->canManageBudget()) {
-                return redirect()->route('budget.index')->with('error', 'Anda tidak memiliki akses untuk menghapus data anggaran.');
+            if (!Auth::user()->can('manage_budget')) {
+                return redirect()->route('budget.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk menghapus data anggaran.');
             }
 
             // Check if budget has related bills
-            $activeBillsCount = $budget->bills()->where('status', '!=', 'cancelled')->count();
+            $activeBillsCount = Bill::where('coa', $budget->full_code)
+                ->whereNotIn('status', ['Dibatalkan'])
+                ->count();
 
             if ($activeBillsCount > 0) {
                 return redirect()->route('budget.show', $budget->id)->with(
@@ -349,13 +384,12 @@ class BudgetController extends Controller
             // Perform deletion with transaction
             DB::transaction(function () use ($budget) {
                 // Delete related cancelled bills if any
-                $budget->bills()->where('status', 'cancelled')->delete();
-
-                // Delete related budget realizations if any
-                $budget->budgetRealizations()->delete();
+                Bill::where('coa', $budget->full_code)
+                    ->where('status', 'Dibatalkan')
+                    ->delete();
 
                 // Clear related cache
-                $this->clearBudgetCache($budget);
+                $budget->clearModelCache();
 
                 // Delete the budget category
                 $budget->delete();
@@ -368,78 +402,13 @@ class BudgetController extends Controller
                 'deleted_at' => now()
             ]);
 
-            return redirect()->route('budget.index')->with('success', 'Data anggaran berhasil dihapus.');
+            return redirect()->route('budget.index')
+                ->with('success', 'Data anggaran berhasil dihapus.');
+
         } catch (\Exception $e) {
-            Log::error('Budget deletion failed', [
-                'id' => $id,
-                'error' => $e->getMessage(),
-                'user_id' => Auth::user()->id
-            ]);
-
-            return redirect()->route('budget.index')->with('error', 'Gagal menghapus data anggaran. Silakan coba lagi.');
-        }
-    }
-
-    // Additional methods...
-    public function export(Request $request)
-    {
-        return Excel::download(new BudgetExport($request->all()), 'budget-data-' . date('Y-m-d') . '.xlsx');
-    }
-
-    public function realizations(Request $request)
-    {
-        $query = BudgetCategory::with(['bills' => function ($q) {
-            $q->where('status', 'sp2d');
-        }]);
-
-        if ($request->filled('search')) {
-            $query->search($request->search);
-        }
-
-        if ($request->filled('pic')) {
-            $query->byPIC($request->pic);
-        }
-
-        $year = $request->get('year', date('Y'));
-
-        $budgets = $query->paginate(20);
-        $pics = BudgetCategory::distinct()->pluck('pic');
-
-        return view('budget.realizations', compact('budgets', 'pics', 'year'));
-    }
-
-    public function realizationDetail($id)
-    {
-        $budget = BudgetCategory::with(['bills' => function ($q) {
-            $q->orderBy('created_at', 'desc');
-        }])->findOrFail($id);
-
-        return view('budget.realization-detail', compact('budget'));
-    }
-
-    /**
-     * Clear budget-related cache
-     */
-    private function clearBudgetCache($budget)
-    {
-        try {
-            $cacheKeys = [
-                "budget_{$budget->id}_total_realization",
-                "budget_{$budget->id}_realization_percentage",
-                "budget_{$budget->id}_remaining_budget",
-                'budget_categories_for_bills',
-            ];
-
-            foreach ($cacheKeys as $key) {
-                Cache::forget($key);
-            }
-
-            Cache::tags(['budget_stats'])->flush();
-        } catch (\Exception $e) {
-            Log::warning('Failed to clear budget cache', [
-                'budget_id' => $budget->id,
-                'error' => $e->getMessage()
-            ]);
+            Log::error('Budget deletion failed: ' . $e->getMessage());
+            return redirect()->route('budget.index')
+                ->with('error', 'Gagal menghapus data anggaran. Silakan coba lagi.');
         }
     }
 }

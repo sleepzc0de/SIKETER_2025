@@ -8,6 +8,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -50,8 +52,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->midd
 | Protected Routes - All Authenticated Users
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'verified'])->group(function () {
-
+Route::middleware(['auth'])->group(function () {
     /*
     |--------------------------------------------------------------------------
     | Dashboard Routes
@@ -70,17 +71,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/budget', [BudgetController::class, 'index'])->name('budget.index');
     Route::get('/budget/export', [BudgetController::class, 'export'])->name('budget.export');
     Route::get('/budget/{id}', [BudgetController::class, 'show'])->name('budget.show')->where('id', '[0-9]+');
-    Route::get('/budget-realizations', [BudgetController::class, 'realizations'])->name('budget.realizations');
-    Route::get('/budget-realizations/{id}', [BudgetController::class, 'realizationDetail'])->name('budget.realization-detail')->where('id', '[0-9]+');
+
+    // Budget Realizations Routes
+    Route::get('/budget/realizations', [BudgetController::class, 'realizations'])->name('budget.realizations');
+    Route::get('/budget/realization-detail/{id}', [BudgetController::class, 'realizationDetail'])->name('budget.realization-detail')->where('id', '[0-9]+');
 
     // Write access only for admin/pimpinan with budget management permission
-    Route::middleware('role:admin,pimpinan')->group(function () {
+    Route::middleware(['role:admin|pimpinan'])->group(function () {
         Route::get('/budget/create', [BudgetController::class, 'create'])->name('budget.create');
         Route::post('/budget', [BudgetController::class, 'store'])->name('budget.store');
         Route::get('/budget/{id}/edit', [BudgetController::class, 'edit'])->name('budget.edit')->where('id', '[0-9]+');
         Route::put('/budget/{id}', [BudgetController::class, 'update'])->name('budget.update')->where('id', '[0-9]+');
         Route::delete('/budget/{id}', [BudgetController::class, 'destroy'])->name('budget.destroy')->where('id', '[0-9]+');
-        Route::delete('/budget', [BudgetController::class, 'bulkDestroy'])->name('budget.bulk-destroy');
+
+        // Bulk Operations
+        Route::delete('/budget/bulk-destroy', [BudgetController::class, 'bulkDestroy'])->name('budget.bulk-destroy');
         Route::get('/budget/{id}/deletion-preview', [BudgetController::class, 'deletionPreview'])->name('budget.deletion-preview')->where('id', '[0-9]+');
 
         // Import/Export Management
@@ -95,7 +100,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     // Read access for all authenticated users
     Route::get('/bills', [BillController::class, 'index'])->name('bills.index');
-    Route::get('/bills/{id}', [BillController::class, 'show'])->name('bills.show')->where('id', '[0-9]+');
+    Route::get('/bills/{bill}', [BillController::class, 'show'])->name('bills.show');
 
     // AJAX Routes for Cascading Dropdowns (accessible by all authenticated users)
     Route::get('/bills/ajax/kros-by-kegiatan', [BillController::class, 'getKrosByKegiatan'])->name('bills.ajax.kros');
@@ -104,22 +109,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/bills/ajax/maks-by-all', [BillController::class, 'getMaksByAll'])->name('bills.ajax.maks');
 
     // Create/Edit Bills - Available for PPK, Pimpinan, and Admin
-    Route::middleware('role:admin,pimpinan,ppk')->group(function () {
+    Route::middleware(['role:admin|pimpinan|ppk'])->group(function () {
         Route::get('/bills/create', [BillController::class, 'create'])->name('bills.create');
         Route::post('/bills', [BillController::class, 'store'])->name('bills.store');
-        Route::get('/bills/{id}/edit', [BillController::class, 'edit'])->name('bills.edit')->where('id', '[0-9]+');
-        Route::put('/bills/{id}', [BillController::class, 'update'])->name('bills.update')->where('id', '[0-9]+');
+        Route::get('/bills/{bill}/edit', [BillController::class, 'edit'])->name('bills.edit');
+        Route::put('/bills/{bill}', [BillController::class, 'update'])->name('bills.update');
 
         // Duplicate bill for same date
         Route::post('/bills/duplicate-for-date', [BillController::class, 'duplicateForDate'])->name('bills.duplicate-for-date');
 
         // Delete bills (only if not SP2D status)
-        Route::delete('/bills/{id}', [BillController::class, 'destroy'])->name('bills.destroy')->where('id', '[0-9]+');
+        Route::delete('/bills/{bill}', [BillController::class, 'destroy'])->name('bills.destroy');
     });
 
     // Bills Status Management and Approval - Admin and Pimpinan only
-    Route::middleware('role:admin,pimpinan')->group(function () {
-        Route::put('/bills/{id}/status', [BillController::class, 'updateStatus'])->name('bills.update-status')->where('id', '[0-9]+');
+    Route::middleware(['role:admin|pimpinan'])->group(function () {
+        Route::put('/bills/{bill}/status', [BillController::class, 'updateStatus'])->name('bills.update-status');
         Route::post('/bills/bulk-update-status', [BillController::class, 'bulkUpdateStatus'])->name('bills.bulk-update-status');
         Route::post('/bills/bulk-approve', [BillController::class, 'bulkApprove'])->name('bills.bulk-approve');
         Route::post('/bills/bulk-reject', [BillController::class, 'bulkReject'])->name('bills.bulk-reject');
@@ -128,7 +133,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Bills Export and Reporting
     Route::get('/bills/export/excel', [BillController::class, 'exportExcel'])->name('bills.export.excel');
     Route::get('/bills/export/pdf', [BillController::class, 'exportPdf'])->name('bills.export.pdf');
-    Route::post('/bills/import', [BillController::class, 'import'])->name('bills.import')->middleware('role:admin,pimpinan');
+    Route::post('/bills/import', [BillController::class, 'import'])->name('bills.import')->middleware(['role:admin|pimpinan']);
 
     /*
     |--------------------------------------------------------------------------
@@ -167,18 +172,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | User Management Routes - Admin only
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:admin')->prefix('users')->name('users.')->group(function () {
+    Route::middleware(['role:admin'])->prefix('users')->name('users.')->group(function () {
         Route::get('/', [UserController::class, 'index'])->name('index');
         Route::get('/create', [UserController::class, 'create'])->name('create');
         Route::post('/', [UserController::class, 'store'])->name('store');
-        Route::get('/{id}', [UserController::class, 'show'])->name('show')->where('id', '[0-9]+');
-        Route::get('/{id}/edit', [UserController::class, 'edit'])->name('edit')->where('id', '[0-9]+');
-        Route::put('/{id}', [UserController::class, 'update'])->name('update')->where('id', '[0-9]+');
-        Route::delete('/{id}', [UserController::class, 'destroy'])->name('destroy')->where('id', '[0-9]+');
+        Route::get('/{user}', [UserController::class, 'show'])->name('show');
+        Route::get('/{user}/edit', [UserController::class, 'edit'])->name('edit');
+        Route::put('/{user}', [UserController::class, 'update'])->name('update');
+        Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
 
         // User Status Management
-        Route::post('/{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('toggle-status')->where('id', '[0-9]+');
-        Route::post('/{id}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password')->where('id', '[0-9]+');
+        Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('toggle-status');
+        Route::post('/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
 
         // Bulk Operations
         Route::post('/bulk-activate', [UserController::class, 'bulkActivate'])->name('bulk-activate');
@@ -198,7 +203,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-
     /*
     |--------------------------------------------------------------------------
     | Role Management Routes
@@ -208,14 +212,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/', [RolePermissionController::class, 'rolesIndex'])->name('index');
         Route::get('/create', [RolePermissionController::class, 'rolesCreate'])->name('create');
         Route::post('/', [RolePermissionController::class, 'rolesStore'])->name('store');
-        Route::get('/{id}', [RolePermissionController::class, 'rolesShow'])->name('show')->where('id', '[0-9]+');
-        Route::get('/{id}/edit', [RolePermissionController::class, 'rolesEdit'])->name('edit')->where('id', '[0-9]+');
-        Route::put('/{id}', [RolePermissionController::class, 'rolesUpdate'])->name('update')->where('id', '[0-9]+');
-        Route::delete('/{id}', [RolePermissionController::class, 'rolesDestroy'])->name('destroy')->where('id', '[0-9]+');
+        Route::get('/{role}', [RolePermissionController::class, 'rolesShow'])->name('show');
+        Route::get('/{role}/edit', [RolePermissionController::class, 'rolesEdit'])->name('edit');
+        Route::put('/{role}', [RolePermissionController::class, 'rolesUpdate'])->name('update');
+        Route::delete('/{role}', [RolePermissionController::class, 'rolesDestroy'])->name('destroy');
 
         // Role Permissions Management
-        Route::get('/{id}/permissions', [RolePermissionController::class, 'rolePermissions'])->name('permissions')->where('id', '[0-9]+');
-        Route::post('/{id}/permissions', [RolePermissionController::class, 'updateRolePermissions'])->name('permissions.update')->where('id', '[0-9]+');
+        Route::get('/{role}/permissions', [RolePermissionController::class, 'rolePermissions'])->name('permissions');
+        Route::post('/{role}/permissions', [RolePermissionController::class, 'updateRolePermissions'])->name('permissions.update');
     });
 
     /*
@@ -227,10 +231,10 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/', [RolePermissionController::class, 'permissionsIndex'])->name('index');
         Route::get('/create', [RolePermissionController::class, 'permissionsCreate'])->name('create');
         Route::post('/', [RolePermissionController::class, 'permissionsStore'])->name('store');
-        Route::get('/{id}', [RolePermissionController::class, 'permissionsShow'])->name('show')->where('id', '[0-9]+');
-        Route::get('/{id}/edit', [RolePermissionController::class, 'permissionsEdit'])->name('edit')->where('id', '[0-9]+');
-        Route::put('/{id}', [RolePermissionController::class, 'permissionsUpdate'])->name('update')->where('id', '[0-9]+');
-        Route::delete('/{id}', [RolePermissionController::class, 'permissionsDestroy'])->name('destroy')->where('id', '[0-9]+');
+        Route::get('/{permission}', [RolePermissionController::class, 'permissionsShow'])->name('show');
+        Route::get('/{permission}/edit', [RolePermissionController::class, 'permissionsEdit'])->name('edit');
+        Route::put('/{permission}', [RolePermissionController::class, 'permissionsUpdate'])->name('update');
+        Route::delete('/{permission}', [RolePermissionController::class, 'permissionsDestroy'])->name('destroy');
 
         // Permission Categories
         Route::get('/categories', [RolePermissionController::class, 'permissionCategories'])->name('categories');
@@ -246,14 +250,11 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/', [RolePermissionController::class, 'userRoles'])->name('index');
         Route::get('/assign', [RolePermissionController::class, 'assignRoleForm'])->name('assign');
         Route::post('/assign', [RolePermissionController::class, 'assignUserRole'])->name('store');
-        Route::delete('/users/{user}/roles/{role}', [RolePermissionController::class, 'removeUserRole'])
-            ->name('remove')->where(['user' => '[0-9]+', 'role' => '[0-9]+']);
+        Route::delete('/users/{user}/roles/{role}', [RolePermissionController::class, 'removeUserRole'])->name('remove');
 
         // Individual user role management
-        Route::get('/users/{user}', [RolePermissionController::class, 'userRoleDetail'])
-            ->name('user.detail')->where('user', '[0-9]+');
-        Route::post('/users/{user}/roles', [RolePermissionController::class, 'assignRoleToUser'])
-            ->name('user.assign')->where('user', '[0-9]+');
+        Route::get('/users/{user}', [RolePermissionController::class, 'userRoleDetail'])->name('user.detail');
+        Route::post('/users/{user}/roles', [RolePermissionController::class, 'assignRoleToUser'])->name('user.assign');
     });
 
     /*
@@ -312,8 +313,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/system-events', [RolePermissionController::class, 'systemEvents'])->name('system-events');
 
         // Export audit logs
-        Route::get('/export/{type}', [RolePermissionController::class, 'exportAuditLog'])
-            ->name('export')->where('type', '[a-zA-Z-]+');
+        Route::get('/export/{type}', [RolePermissionController::class, 'exportAuditLog'])->name('export')->where('type', '[a-zA-Z-]+');
     });
 });
 
@@ -323,12 +323,11 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth'])->prefix('api/v1')->name('api.')->group(function () {
-
     // Budget API
     Route::prefix('budget')->name('budget.')->group(function () {
         Route::get('/search', [BudgetController::class, 'apiSearch'])->name('search');
         Route::get('/categories', [BudgetController::class, 'apiCategories'])->name('categories');
-        Route::get('/{id}/realization', [BudgetController::class, 'apiRealization'])->name('realization');
+        Route::get('/{budget}/realization', [BudgetController::class, 'apiRealization'])->name('realization');
     });
 
     // Bills API
@@ -346,7 +345,7 @@ Route::middleware(['auth'])->prefix('api/v1')->name('api.')->group(function () {
     });
 
     // User API (Admin only)
-    Route::middleware('role:admin')->prefix('users')->name('users.')->group(function () {
+    Route::middleware(['role:admin'])->prefix('users')->name('users.')->group(function () {
         Route::get('/search', [UserController::class, 'apiSearch'])->name('search');
         Route::get('/roles', [UserController::class, 'apiRoles'])->name('roles');
     });
@@ -360,32 +359,19 @@ Route::middleware(['auth'])->prefix('api/v1')->name('api.')->group(function () {
 Route::middleware(['auth'])->prefix('download')->name('download.')->group(function () {
     // Budget downloads
     Route::get('/budget-template', [BudgetController::class, 'downloadTemplate'])->name('budget.template');
-    Route::get('/budget-export/{format}', [BudgetController::class, 'downloadExport'])
-        ->name('budget.export')->where('format', '(xlsx|csv|pdf)');
+    Route::get('/budget-export/{format}', [BudgetController::class, 'downloadExport'])->name('budget.export')->where('format', '(xlsx|csv|pdf)');
 
     // Bills downloads
-    Route::get('/bills-export/{format}', [BillController::class, 'downloadExport'])
-        ->name('bills.export')->where('format', '(xlsx|csv|pdf)');
+    Route::get('/bills-export/{format}', [BillController::class, 'downloadExport'])->name('bills.export')->where('format', '(xlsx|csv|pdf)');
 
     // Reports downloads
-    Route::get('/report/{type}/{format}', [ReportController::class, 'downloadReport'])
-        ->name('report')->where(['type' => '[a-zA-Z-]+', 'format' => '(xlsx|csv|pdf)']);
+    Route::get('/report/{type}/{format}', [ReportController::class, 'downloadReport'])->name('report')->where(['type' => '[a-zA-Z-]+', 'format' => '(xlsx|csv|pdf)']);
 
     // System downloads (Admin only)
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware(['role:admin'])->group(function () {
         Route::get('/user-template', [UserController::class, 'downloadTemplate'])->name('user.template');
-        Route::get('/backup/{file}', [RolePermissionController::class, 'downloadBackup'])
-            ->name('backup')->where('file', '[a-zA-Z0-9._-]+');
+        Route::get('/backup/{file}', [RolePermissionController::class, 'downloadBackup'])->name('backup')->where('file', '[a-zA-Z0-9._-]+');
     });
-});
-
-/*
-|--------------------------------------------------------------------------
-| Error Handling Routes
-|--------------------------------------------------------------------------
-*/
-Route::fallback(function () {
-    return response()->view('errors.404', [], 404);
 });
 
 /*
@@ -402,12 +388,35 @@ Route::get('/health', function () {
 })->name('health.check');
 
 Route::middleware(['auth', 'role:admin'])->get('/health/detailed', function () {
+    try {
+        $dbStatus = DB::connection()->getPdo() ? 'connected' : 'disconnected';
+    } catch (Exception $e) {
+        $dbStatus = 'disconnected';
+    }
+
+    try {
+        Cache::put('health_check', 'test', 60);
+        $cacheStatus = Cache::get('health_check') === 'test' ? 'working' : 'not working';
+        Cache::forget('health_check');
+    } catch (Exception $e) {
+        $cacheStatus = 'not working';
+    }
+
     return response()->json([
         'status' => 'ok',
         'timestamp' => now(),
         'environment' => app()->environment(),
-        'database' => DB::connection()->getPdo() ? 'connected' : 'disconnected',
-        'cache' => cache()->get('health_check') !== null ? 'working' : 'not working',
+        'database' => $dbStatus,
+        'cache' => $cacheStatus,
         'storage' => is_writable(storage_path()) ? 'writable' : 'not writable',
     ]);
 })->name('health.detailed');
+
+/*
+|--------------------------------------------------------------------------
+| Error Handling Routes
+|--------------------------------------------------------------------------
+*/
+Route::fallback(function () {
+    return response()->view('errors.404', [], 404);
+});
