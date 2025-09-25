@@ -71,50 +71,50 @@ class BillController extends Controller
     }
 
     public function create(Request $request)
-    {
-        try {
-            $duplicateDate = $request->get('duplicate_date');
-            $existingBill = null;
+{
+    try {
+        $duplicateDate = $request->get('duplicate_date');
+        $existingBill = null;
 
-            if ($duplicateDate) {
-                $existingBill = Bill::where('tgl_spp', $duplicateDate)->first();
-            }
-
-            // Get all required data for form
-            $months = Bill::MONTHS;
-            $kontraktualTypes = Bill::KONTRAKTUAL_TYPES;
-            $bagians = Bill::BAGIAN_OPTIONS;
-            $statusOptions = Bill::STATUS_OPTIONS;
-            $lsBendaharaOptions = Bill::LS_BENDAHARA_OPTIONS;
-            $staffPpkOptions = Bill::STAFF_PPK_OPTIONS;
-            $posisiUangOptions = Bill::POSISI_UANG_OPTIONS;
-
-            // Get coding options from budget categories
-            $kodeKegiatans = BudgetCategory::distinct()
-                ->pluck('kegiatan')
-                ->filter()
-                ->sort()
-                ->values();
-
-            return view('bills.create', compact(
-                'duplicateDate',
-                'existingBill',
-                'months',
-                'kontraktualTypes',
-                'bagians',
-                'statusOptions',
-                'lsBendaharaOptions',
-                'staffPpkOptions',
-                'posisiUangOptions',
-                'kodeKegiatans'
-            ));
-
-        } catch (\Exception $e) {
-            Log::error('Error in bills create: ' . $e->getMessage());
-            return redirect()->route('bills.index')
-                ->with('error', 'Terjadi kesalahan saat memuat halaman tambah tagihan.');
+        if ($duplicateDate) {
+            $existingBill = Bill::where('tgl_spp', $duplicateDate)->first();
         }
+
+        // Get all required data for form
+        $months = Bill::MONTHS;
+        $kontraktualTypes = Bill::KONTRAKTUAL_TYPES;
+        $bagians = Bill::BAGIAN_OPTIONS;
+        $statusOptions = Bill::STATUS_OPTIONS;
+        $lsBendaharaOptions = Bill::LS_BENDAHARA_OPTIONS;
+        $staffPpkOptions = Bill::STAFF_PPK_OPTIONS;
+        $posisiUangOptions = Bill::POSISI_UANG_OPTIONS;
+
+        // Get coding options from budget categories
+        $kodeKegiatans = BudgetCategory::distinct()
+            ->pluck('kegiatan')
+            ->filter()
+            ->sort()
+            ->values();
+
+        return view('bills.create', compact(
+            'duplicateDate',
+            'existingBill',
+            'months',
+            'kontraktualTypes',
+            'bagians',
+            'statusOptions',
+            'lsBendaharaOptions',
+            'staffPpkOptions',
+            'posisiUangOptions',
+            'kodeKegiatans'
+        ));
+
+    } catch (\Exception $e) {
+        Log::error('Error in bills create: ' . $e->getMessage());
+        return redirect()->route('bills.index')
+            ->with('error', 'Terjadi kesalahan saat memuat halaman tambah tagihan.');
     }
+}
 
     public function store(Request $request)
     {

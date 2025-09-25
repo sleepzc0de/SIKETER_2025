@@ -35,7 +35,7 @@
                 <!-- No -->
                 <div>
                     <label for="no" class="block text-sm font-medium text-gray-700">No</label>
-                    <input type="text" name="no" id="no" value="{{ old('no') }}"
+                    <input type="text" name="no" id="no" value="{{ old('no', $existingBill->no ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('no') border-red-300 @enderror">
                     @error('no')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -49,7 +49,7 @@
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('month') border-red-300 @enderror">
                         <option value="">Pilih Bulan</option>
                         @foreach($months as $key => $value)
-                            <option value="{{ $key }}" {{ old('month') == $key ? 'selected' : '' }}>{{ $value }}</option>
+                            <option value="{{ $key }}" {{ old('month', $existingBill->month ?? '') == $key ? 'selected' : '' }}>{{ $value }}</option>
                         @endforeach
                     </select>
                     @error('month')
@@ -60,7 +60,7 @@
                 <!-- No SPP -->
                 <div>
                     <label for="no_spp" class="block text-sm font-medium text-gray-700">No SPP</label>
-                    <input type="text" name="no_spp" id="no_spp" value="{{ old('no_spp') }}"
+                    <input type="text" name="no_spp" id="no_spp" value="{{ old('no_spp', $existingBill->no_spp ?? '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('no_spp') border-red-300 @enderror">
                     @error('no_spp')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -163,7 +163,8 @@
                 <!-- Tanggal ST/SK -->
                 <div>
                     <label for="tanggal_st_sk" class="block text-sm font-medium text-gray-700">Tanggal ST/SK</label>
-                    <input type="date" name="tanggal_st_sk" id="tanggal_st_sk" value="{{ old('tanggal_st_sk', $existingBill->tanggal_st_sk ? $existingBill->tanggal_st_sk->format('Y-m-d') : '') }}"
+                    <input type="date" name="tanggal_st_sk" id="tanggal_st_sk"
+                           value="{{ old('tanggal_st_sk', ($existingBill && $existingBill->tanggal_st_sk) ? $existingBill->tanggal_st_sk->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tanggal_st_sk') border-red-300 @enderror">
                     @error('tanggal_st_sk')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -224,7 +225,7 @@
                     @enderror
                 </div>
 
-                <!-- Kode Kegiatan -->
+               <!-- Kode Kegiatan -->
                 <div>
                     <label for="kode_kegiatan" class="block text-sm font-medium text-gray-700">Kode Kegiatan</label>
                     <select name="kode_kegiatan" id="kode_kegiatan" @change="updateKros()"
@@ -350,7 +351,8 @@
                 <!-- Tanggal Mulai -->
                 <div>
                     <label for="tanggal_mulai" class="block text-sm font-medium text-gray-700">Tanggal Mulai</label>
-                    <input type="date" name="tanggal_mulai" id="tanggal_mulai" value="{{ old('tanggal_mulai', $existingBill->tanggal_mulai ? $existingBill->tanggal_mulai->format('Y-m-d') : '') }}"
+                    <input type="date" name="tanggal_mulai" id="tanggal_mulai"
+                           value="{{ old('tanggal_mulai', ($existingBill && $existingBill->tanggal_mulai) ? $existingBill->tanggal_mulai->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tanggal_mulai') border-red-300 @enderror">
                     @error('tanggal_mulai')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -360,7 +362,8 @@
                 <!-- Tanggal Selesai -->
                 <div>
                     <label for="tanggal_selesai" class="block text-sm font-medium text-gray-700">Tanggal Selesai</label>
-                    <input type="date" name="tanggal_selesai" id="tanggal_selesai" value="{{ old('tanggal_selesai', $existingBill->tanggal_selesai ? $existingBill->tanggal_selesai->format('Y-m-d') : '') }}"
+                    <input type="date" name="tanggal_selesai" id="tanggal_selesai"
+                           value="{{ old('tanggal_selesai', ($existingBill && $existingBill->tanggal_selesai) ? $existingBill->tanggal_selesai->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tanggal_selesai') border-red-300 @enderror">
                     @error('tanggal_selesai')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -432,7 +435,8 @@
                 <!-- Tgl Selesai SP2D -->
                 <div>
                     <label for="tgl_selesai_sp2d" class="block text-sm font-medium text-gray-700">Tgl Selesai SP2D</label>
-                    <input type="date" name="tgl_selesai_sp2d" id="tgl_selesai_sp2d" value="{{ old('tgl_selesai_sp2d', $existingBill->tgl_selesai_sp2d ? $existingBill->tgl_selesai_sp2d->format('Y-m-d') : '') }}"
+                    <input type="date" name="tgl_selesai_sp2d" id="tgl_selesai_sp2d"
+                           value="{{ old('tgl_selesai_sp2d', ($existingBill && $existingBill->tgl_selesai_sp2d) ? $existingBill->tgl_selesai_sp2d->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tgl_selesai_sp2d') border-red-300 @enderror">
                     @error('tgl_selesai_sp2d')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -442,7 +446,8 @@
                 <!-- Tgl SP2D -->
                 <div>
                     <label for="tgl_sp2d" class="block text-sm font-medium text-gray-700">Tgl SP2D</label>
-                    <input type="date" name="tgl_sp2d" id="tgl_sp2d" value="{{ old('tgl_sp2d', $existingBill->tgl_sp2d ? $existingBill->tgl_sp2d->format('Y-m-d') : '') }}"
+                    <input type="date" name="tgl_sp2d" id="tgl_sp2d"
+                           value="{{ old('tgl_sp2d', ($existingBill && $existingBill->tgl_sp2d) ? $existingBill->tgl_sp2d->format('Y-m-d') : '') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-navy-500 focus:ring-navy-500 sm:text-sm @error('tgl_sp2d') border-red-300 @enderror">
                     @error('tgl_sp2d')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -680,7 +685,6 @@ function billManager() {
         },
 
         showError(message) {
-            // Simple error notification
             const notification = document.createElement('div');
             notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
             notification.textContent = message;

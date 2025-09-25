@@ -121,7 +121,6 @@ class BudgetController extends Controller
                 'pics',
                 'year'
             ));
-
         } catch (\Exception $e) {
             Log::error('Error in budget realizations: ' . $e->getMessage());
             return redirect()->back()
@@ -147,7 +146,6 @@ class BudgetController extends Controller
                 ->paginate(20);
 
             return view('budget.realization-detail', compact('budget', 'bills'));
-
         } catch (\Exception $e) {
             Log::error('Error in budget realization detail: ' . $e->getMessage());
             return redirect()->route('budget.realizations')
@@ -158,8 +156,8 @@ class BudgetController extends Controller
     public function store(Request $request)
     {
         try {
-            // Check permission
-            if (!Auth::user()->can('manage_budget')) {
+            // Check permission dengan method yang benar
+            if (!Auth::user()->canManageBudget()) {
                 return redirect()->route('budget.index')
                     ->with('error', 'Anda tidak memiliki akses untuk menambah data anggaran.');
             }
@@ -189,10 +187,18 @@ class BudgetController extends Controller
 
             // Initialize monthly realization fields to 0
             $monthlyFields = [
-                'realisasi_jan', 'realisasi_feb', 'realisasi_mar',
-                'realisasi_apr', 'realisasi_mei', 'realisasi_jun',
-                'realisasi_jul', 'realisasi_agu', 'realisasi_sep',
-                'realisasi_okt', 'realisasi_nov', 'realisasi_des'
+                'realisasi_jan',
+                'realisasi_feb',
+                'realisasi_mar',
+                'realisasi_apr',
+                'realisasi_mei',
+                'realisasi_jun',
+                'realisasi_jul',
+                'realisasi_agu',
+                'realisasi_sep',
+                'realisasi_okt',
+                'realisasi_nov',
+                'realisasi_des'
             ];
 
             foreach ($monthlyFields as $field) {
@@ -209,7 +215,6 @@ class BudgetController extends Controller
 
             return redirect()->route('budget.show', $budget->id)
                 ->with('success', 'Data anggaran berhasil ditambahkan.');
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()->withErrors($e->validator)->withInput();
         } catch (\Exception $e) {
@@ -220,11 +225,12 @@ class BudgetController extends Controller
         }
     }
 
+
     public function update(Request $request, $id)
     {
         try {
             // Check permission
-            if (!Auth::user()->can('manage_budget')) {
+            if (!Auth::user()->canManageBudget()) {
                 return redirect()->route('budget.index')
                     ->with('error', 'Anda tidak memiliki akses untuk mengedit data anggaran.');
             }
@@ -265,7 +271,6 @@ class BudgetController extends Controller
 
             return redirect()->route('budget.show', $budget->id)
                 ->with('success', 'Data anggaran berhasil diperbarui.');
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()->withErrors($e->validator)->withInput();
         } catch (\Exception $e) {
@@ -275,6 +280,7 @@ class BudgetController extends Controller
                 ->withInput();
         }
     }
+
 
     public function show($id)
     {
@@ -309,7 +315,6 @@ class BudgetController extends Controller
             ]);
 
             return view('budget.show', compact('budget', 'monthlyData', 'bills'));
-
         } catch (\Exception $e) {
             Log::error('Budget show error: ' . $e->getMessage());
             return redirect()->route('budget.index')
@@ -330,27 +335,33 @@ class BudgetController extends Controller
 
     public function create()
     {
-        // Check permission
-        if (!Auth::user()->can('manage_budget')) {
-            return redirect()->route('budget.index')
-                ->with('error', 'Anda tidak memiliki akses untuk menambah data anggaran.');
-        }
+        try {
+            // Check permission dengan method yang benar
+            if (!Auth::user()->canManageBudget()) {
+                return redirect()->route('budget.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk menambah data anggaran.');
+            }
 
-        return view('budget.create');
+            return view('budget.create');
+        } catch (\Exception $e) {
+            Log::error('Budget create error: ' . $e->getMessage());
+            return redirect()->route('budget.index')
+                ->with('error', 'Terjadi kesalahan saat memuat halaman tambah anggaran.');
+        }
     }
+
 
     public function edit($id)
     {
         try {
             // Check permission
-            if (!Auth::user()->can('manage_budget')) {
+            if (!Auth::user()->canManageBudget()) {
                 return redirect()->route('budget.index')
                     ->with('error', 'Anda tidak memiliki akses untuk mengedit data anggaran.');
             }
 
             $budget = BudgetCategory::findOrFail($id);
             return view('budget.edit', compact('budget'));
-
         } catch (\Exception $e) {
             Log::error('Budget edit error: ' . $e->getMessage());
             return redirect()->route('budget.index')
@@ -358,13 +369,14 @@ class BudgetController extends Controller
         }
     }
 
+
     public function destroy($id)
     {
         try {
             $budget = BudgetCategory::findOrFail($id);
 
             // Authorization check
-            if (!Auth::user()->can('manage_budget')) {
+            if (!Auth::user()->canManageBudget()) {
                 return redirect()->route('budget.index')
                     ->with('error', 'Anda tidak memiliki akses untuk menghapus data anggaran.');
             }
@@ -404,7 +416,6 @@ class BudgetController extends Controller
 
             return redirect()->route('budget.index')
                 ->with('success', 'Data anggaran berhasil dihapus.');
-
         } catch (\Exception $e) {
             Log::error('Budget deletion failed: ' . $e->getMessage());
             return redirect()->route('budget.index')
