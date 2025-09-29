@@ -58,7 +58,6 @@ class BillController extends Controller
             $bagians = Bill::getBagianOptions();
 
             return view('bills.index', compact('bills', 'months', 'statuses', 'bagians'));
-
         } catch (\Exception $e) {
             Log::error('Bills index error: ' . $e->getMessage());
             return view('bills.index', [
@@ -71,50 +70,49 @@ class BillController extends Controller
     }
 
     public function create(Request $request)
-{
-    try {
-        $duplicateDate = $request->get('duplicate_date');
-        $existingBill = null;
+    {
+        try {
+            $duplicateDate = $request->get('duplicate_date');
+            $existingBill = null;
 
-        if ($duplicateDate) {
-            $existingBill = Bill::where('tgl_spp', $duplicateDate)->first();
+            if ($duplicateDate) {
+                $existingBill = Bill::where('tgl_spp', $duplicateDate)->first();
+            }
+
+            // Get all required data for form
+            $months = Bill::MONTHS;
+            $kontraktualTypes = Bill::KONTRAKTUAL_TYPES;
+            $bagians = Bill::BAGIAN_OPTIONS;
+            $statusOptions = Bill::STATUS_OPTIONS;
+            $lsBendaharaOptions = Bill::LS_BENDAHARA_OPTIONS;
+            $staffPpkOptions = Bill::STAFF_PPK_OPTIONS;
+            $posisiUangOptions = Bill::POSISI_UANG_OPTIONS;
+
+            // Get coding options from budget categories
+            $kodeKegiatans = BudgetCategory::distinct()
+                ->pluck('kegiatan')
+                ->filter()
+                ->sort()
+                ->values();
+
+            return view('bills.create', compact(
+                'duplicateDate',
+                'existingBill',
+                'months',
+                'kontraktualTypes',
+                'bagians',
+                'statusOptions',
+                'lsBendaharaOptions',
+                'staffPpkOptions',
+                'posisiUangOptions',
+                'kodeKegiatans'
+            ));
+        } catch (\Exception $e) {
+            Log::error('Error in bills create: ' . $e->getMessage());
+            return redirect()->route('bills.index')
+                ->with('error', 'Terjadi kesalahan saat memuat halaman tambah tagihan.');
         }
-
-        // Get all required data for form
-        $months = Bill::MONTHS;
-        $kontraktualTypes = Bill::KONTRAKTUAL_TYPES;
-        $bagians = Bill::BAGIAN_OPTIONS;
-        $statusOptions = Bill::STATUS_OPTIONS;
-        $lsBendaharaOptions = Bill::LS_BENDAHARA_OPTIONS;
-        $staffPpkOptions = Bill::STAFF_PPK_OPTIONS;
-        $posisiUangOptions = Bill::POSISI_UANG_OPTIONS;
-
-        // Get coding options from budget categories
-        $kodeKegiatans = BudgetCategory::distinct()
-            ->pluck('kegiatan')
-            ->filter()
-            ->sort()
-            ->values();
-
-        return view('bills.create', compact(
-            'duplicateDate',
-            'existingBill',
-            'months',
-            'kontraktualTypes',
-            'bagians',
-            'statusOptions',
-            'lsBendaharaOptions',
-            'staffPpkOptions',
-            'posisiUangOptions',
-            'kodeKegiatans'
-        ));
-
-    } catch (\Exception $e) {
-        Log::error('Error in bills create: ' . $e->getMessage());
-        return redirect()->route('bills.index')
-            ->with('error', 'Terjadi kesalahan saat memuat halaman tambah tagihan.');
     }
-}
 
     public function store(Request $request)
     {
@@ -184,7 +182,6 @@ class BillController extends Controller
 
             return redirect()->route('bills.show', $bill->id)
                 ->with('success', 'Tagihan berhasil dibuat.');
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()->withErrors($e->validator)->withInput();
         } catch (\Exception $e) {
@@ -207,9 +204,12 @@ class BillController extends Controller
         }
     }
 
-    public function edit(Bill $bill)
+
+    public function edit($id)
     {
         try {
+            $bill = Bill::findOrFail($id);
+
             // Get all required data for form
             $months = Bill::MONTHS;
             $kontraktualTypes = Bill::KONTRAKTUAL_TYPES;
@@ -237,13 +237,60 @@ class BillController extends Controller
                 'posisiUangOptions',
                 'kodeKegiatans'
             ));
-
         } catch (\Exception $e) {
             Log::error('Error in bills edit: ' . $e->getMessage());
             return redirect()->route('bills.index')
                 ->with('error', 'Terjadi kesalahan saat memuat halaman edit tagihan.');
         }
     }
+
+    public function updateStatus(Request $request, $id)
+    {
+        try {
+            $bill = Bill::findOrFail($id);
+            $validated = $request->validate([
+                'status' => 'required|in:' . implode(',', array_keys(Bill::getStatusOptions())),
+                'notes' => 'nullable|string|max:1000'
+            ]);
+
+            $oldStatus = $bill->status;
+            $bill->status = $validated['status'];
+            $bill->updated_by = Auth::id();
+
+            // Set approval data when status changes to SP2D
+            if ($validated['status'] === 'Tagihan Telah SP2D' && $oldStatus !== 'Tagihan Telah SP2D') {
+                $bill->approved_at = now();
+                $bill->approved_by = Auth::id();
+                if (!$bill->tgl_sp2d) {
+                    $bill->tgl_sp2d = now()->toDateString();
+                }
+            }
+
+            // Clear approval data when status changes from SP2D
+            if ($oldStatus === 'Tagihan Telah SP2D' && $validated['status'] !== 'Tagihan Telah SP2D') {
+                $bill->approved_at = null;
+                $bill->approved_by = null;
+            }
+
+            $bill->save();
+
+            Log::info('Bill status updated', [
+                'bill_id' => $bill->id,
+                'old_status' => $oldStatus,
+                'new_status' => $validated['status'],
+                'updated_by' => Auth::id()
+            ]);
+
+            return redirect()->route('bills.show', $bill->id)
+                ->with('success', 'Status tagihan berhasil diperbarui.');
+        } catch (\Exception $e) {
+            Log::error('Bill status update failed: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Gagal memperbarui status tagihan.');
+        }
+    }
+
+
 
     public function update(Request $request, $id)
     {
@@ -323,7 +370,6 @@ class BillController extends Controller
 
             return redirect()->route('bills.show', $bill->id)
                 ->with('success', 'Tagihan berhasil diperbarui.');
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()->withErrors($e->validator)->withInput();
         } catch (\Exception $e) {
@@ -363,7 +409,6 @@ class BillController extends Controller
 
             return redirect()->route('bills.index')
                 ->with('success', 'Tagihan berhasil dihapus.');
-
         } catch (\Exception $e) {
             Log::error('Bill deletion failed: ' . $e->getMessage());
             return redirect()->route('bills.index')
